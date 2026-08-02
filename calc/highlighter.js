@@ -380,7 +380,7 @@ function updateHistoryTableAutoHlt() {
 	    
 		document.getElementById("highlightBox").value = substr // populate highlight box
 
-		histDisplayOrder = buildHistMatchOrder() // stack the most-matched phrases at the top
+		applyHistMatchOrder() // stack matches at the top, hide phrases with none
 		updateHistoryTableSameCiphMatch() // update table
 		
 		//freq = [] // frequency of matches found with auto highlighter
@@ -477,7 +477,7 @@ function updateHistoryTableAutoHlt() {
 	substr = str.substring(1, str.length - 1) // remove brackets
 	document.getElementById("highlightBox").value = substr
 
-	histDisplayOrder = buildHistMatchOrder() // stack the most-matched phrases at the top
+	applyHistMatchOrder() // stack matches at the top, hide phrases with none
 	updateHistoryTable() // update table
 }
 
@@ -581,9 +581,21 @@ function buildHistMatchOrder() {
 	for (i = 0; i < groupList.length; i++) {
 		for (y = 0; y < groupList[i].members.length; y++) order.push(groupList[i].members[y].idx)
 	}
-	for (i = 0; i < unmatched.length; i++) order.push(unmatched[i]) // no-match phrases sink to the bottom
 
-	return { order: order, snapshot: sHistory.slice() }
+	// Phrases with no matches at all are left out of the display order entirely,
+	// so the table shows only what matched. They are still in sHistory and come
+	// back on Reset Order; nothing is deleted.
+	return { order: order, snapshot: sHistory.slice(), hidden: unmatched.length }
+}
+
+// Applies the match ordering and tells the user how many phrases dropped out,
+// so a suddenly shorter table is never mistaken for lost data.
+function applyHistMatchOrder() {
+	histDisplayOrder = buildHistMatchOrder()
+	if (histDisplayOrder !== null && histDisplayOrder.hidden > 0) {
+		var n = histDisplayOrder.hidden
+		displayCalcNotification(n + (n === 1 ? " phrase hidden" : " phrases hidden") + " with no matches", 2200)
+	}
 }
 
 // Returns the match order only while it still describes the current history.

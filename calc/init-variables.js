@@ -562,13 +562,13 @@ $(document).ready(function(){
 					initCiphers(false) // don't update default ciphers, recalculate order of categories
 					createCiphersMenu() // recreate menus
 					createOptionsMenu()
-					createFeaturesMenu()
 					createFindMatchesMenu()
 					createDateCalcMenu()
 					createAstrologyMenu()
 					createExportMenu()
 					createAboutMenu()
 					createBgToggleButton()
+					createAuthNavArea()
 
 					if (userDBlive.length !== 0) { // restore controls if live database is loaded
 						$("#queryDBbtn").removeClass("hideValue") // display query button

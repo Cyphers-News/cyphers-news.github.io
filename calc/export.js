@@ -1,5 +1,84 @@
 // ============================= Export =============================
 
+// ---- Right-click export menu ----------------------------------------
+//
+// Everything in the Export tab, reachable without opening the menu. Each entry
+// points at the existing Export button so there is one implementation of each
+// action; `need` is a selector that must exist for the item to be usable,
+// which keeps handlers that assume a panel is open from throwing.
+
+var ctxExportItems = [
+	{ label: "Print Cyphers Chart",    btn: "#btn-print-cipher-png",            need: "#ChartTable" },
+	{ label: "Print History Table",    btn: "#btn-print-history-png",           need: ".HistoryTable" },
+	{ label: "Print Word Breakdown",   btn: "#btn-print-word-break-png",        need: "#BreakTableContainer" },
+	{ label: "Print Cyphers Card",     btn: "#btn-print-breakdown-details-png", need: "#BreakdownDetails" },
+	{ label: "Print Number Properties",btn: "#btn-num-props-png",               need: ".numPropTooltip" },
+	{ label: "Print Date Durations",   btn: "#btn-date-calc-png",               need: ".dateCalcTable2" },
+	{ sep: true },
+	{ label: "Export History (CSV)",   btn: "#btn-export-history-png",          need: ".HistoryTable" },
+	{ label: "Export Matches (TXT)",   btn: "#btn-export-matches-txt",          need: ".HistoryTable" },
+	{ label: "Export DB Query (CSV)",  btn: "#btn-export-db-query",             need: "#QueryTable" }
+]
+
+function closeExportContextMenu() {
+	$("#ctxExportMenu").remove()
+}
+
+function runExportContextItem(idx) {
+	closeExportContextMenu()
+	var item = ctxExportItems[idx]
+	if (!item || item.sep) return
+	if (item.need && $(item.need).length === 0) return
+	$(item.btn).click() // reuse the Export tab's own handler
+}
+
+function showExportContextMenu(px, py) {
+	closeExportContextMenu()
+
+	var o = '<div id="ctxExportMenu">'
+	o += '<div class="ctxExportTitle">Export</div>'
+	for (var i = 0; i < ctxExportItems.length; i++) {
+		var item = ctxExportItems[i]
+		if (item.sep) { o += '<div class="ctxExportSep"></div>'; continue }
+		var avail = $(item.need).length > 0
+		o += '<div class="ctxExportItem'+(avail ? '' : ' ctxExportDisabled')+'"'
+		o += avail ? ' onclick="runExportContextItem('+i+')"' : ' title="Not available right now"'
+		o += '>'+item.label+'</div>'
+	}
+	o += '</div>'
+
+	$(o).appendTo("body")
+
+	// keep the menu on screen when opened near an edge
+	var $m = $("#ctxExportMenu")
+	var mw = $m.outerWidth(), mh = $m.outerHeight()
+	var vw = $(window).width(), vh = $(window).height()
+	var left = px, top = py
+	if (left + mw > vw - 4) left = Math.max(4, vw - mw - 4)
+	if (top + mh > vh + $(window).scrollTop() - 4) top = Math.max(4, py - mh)
+	$m.css({ left: left + "px", top: top + "px" })
+}
+
+$(document).ready(function () {
+	$("body").on("contextmenu", function (e) {
+		var $t = $(e.target)
+		// leave the native menu alone in text fields, and don't fight the
+		// date-duration line handler which uses right-click to delete a line
+		if ($t.is("input, textarea, select")) return
+		if ($t.closest(".dateDurLine").length) return
+		if ($t.closest("#ctxExportMenu").length) return
+		e.preventDefault()
+		showExportContextMenu(e.pageX, e.pageY)
+	})
+	$(document).on("click", function (e) {
+		if ($(e.target).closest("#ctxExportMenu").length === 0) closeExportContextMenu()
+	})
+	$(document).on("keydown", function (e) {
+		if (e.key === "Escape" || e.keyCode === 27) closeExportContextMenu()
+	})
+	$(window).on("scroll resize", closeExportContextMenu)
+})
+
 // ---- Word Breakdown export prep -------------------------------------
 //
 // The exported breakdown used to capture only #BreakTableContainer, which is

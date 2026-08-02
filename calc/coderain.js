@@ -30,6 +30,26 @@ var coderainRanges = [
 var coderainGlyphs = [] // flat array of renderable characters
 var coderainFontStack = "'Roboto Mono', 'Segoe UI', system-ui, sans-serif"
 
+// CCRU style: the numogram is decimal, so digits dominate, cut with hex letters
+// and block/technical glyphs for a harder machine look.
+var coderainCCRUPool = [
+	["0123456789", 6],
+	["ABCDEF", 1],
+	["▓▒░│┃╱╲╳", 2],
+	["⌁⌇⧉◤◥◣◢", 1]
+]
+var coderainCCRUGlyphs = []
+
+function buildCCRUGlyphs() {
+	if (coderainCCRUGlyphs.length) return
+	for (var i = 0; i < coderainCCRUPool.length; i++) {
+		var set = coderainCCRUPool[i][0], weight = coderainCCRUPool[i][1]
+		for (var r = 0; r < weight; r++) {
+			for (var c = 0; c < set.length; c++) coderainCCRUGlyphs.push(set.charAt(c))
+		}
+	}
+}
+
 // Renders a character offscreen and returns a bitmap signature of the result.
 // Comparing signatures is the only reliable way to spot a missing glyph:
 // measuring advance width does not work, because in a monospace face the
@@ -108,9 +128,12 @@ var coderainSpeedVar = 0.45  // random extra on top of the minimum
 var coderainDPR = 1
 var coderainReducedMotion = false
 
-// retro ran at 50ms; the new style needs 30fps or it reads as stutter
+// retro ran at 50ms; the new style needs 30fps or it reads as stutter, and
+// CCRU is deliberately the twitchiest of the three
 function coderainFrameInterval() {
-	return (coderainStyle === "retro") ? 50 : 33
+	if (coderainStyle === "retro") return 50
+	if (coderainStyle === "ccru") return 28
+	return 33
 }
 
 function coderainSpeed() {
@@ -142,7 +165,21 @@ function initCodeRain() {
 		return
 	}
 
-	buildCodeRainGlyphs()
+	if (coderainStyle === "ccru") {
+		buildCCRUGlyphs()
+		coderainCellW = 12  // dense grid, roughly twice the columns of the standard style
+		coderainCellH = 14
+		coderainFadeAlpha = 0.16
+		coderainSpeedMin = 0.70
+		coderainSpeedVar = 0.85
+	} else {
+		buildCodeRainGlyphs()
+		coderainCellW = 22
+		coderainCellH = 24
+		coderainFadeAlpha = 0.17
+		coderainSpeedMin = 0.45
+		coderainSpeedVar = 0.45
+	}
 
 	// size the backing store to the device pixel ratio so glyphs stay crisp,
 	// then work in CSS pixels for everything else
@@ -155,19 +192,23 @@ function initCodeRain() {
 	canvas.height = Math.floor(h * coderainDPR)
 	ctx.setTransform(coderainDPR, 0, 0, coderainDPR, 0, 0)
 
-	// fill with the interface background so the first frames fade in from it
-	ctx.fillStyle = "hsl("+interfaceHue+","+(22*interfaceSat)+"%,"+(16*interfaceLit)+"%)"
+	// CCRU sits on its own green wash; the standard style fades from the
+	// interface background so it disappears into the page
+	ctx.fillStyle = (coderainStyle === "ccru")
+		? coderainCCRUBg(1)
+		: "hsl("+interfaceHue+","+(22*interfaceSat)+"%,"+(16*interfaceLit)+"%)"
 	ctx.fillRect(0, 0, w, h)
 
 	cols = Math.floor(w / coderainCellW) + 1
+
+	// CCRU keeps nearly every column live at once, the standard style leaves gaps
+	var stagger = (coderainStyle === "ccru") ? 0.3 : 1.05
 
 	coderainDrops = []
 	var maxRow = h / coderainCellH
 	for (var i = 0; i < cols; i++) {
 		coderainDrops.push({
-			// negative start rows stagger the columns and leave gaps, so only
-			// part of the screen is raining at any one moment
-			row: -Math.random() * maxRow * 1.05,
+			row: -Math.random() * maxRow * stagger,
 			speed: coderainSpeed()
 		})
 	}
@@ -177,7 +218,92 @@ function initCodeRain() {
 function matrix() {
 	if (!ctx) return
 	if (coderainStyle === "retro") matrixRetro()
+	else if (coderainStyle === "ccru") matrixCCRU()
 	else matrixNew()
+}
+
+// CCRU has its own committed palette: a green wash behind neon glyphs. It
+// ignores the follow-the-cipher colour on purpose, that option shapes the
+// standard style. Denser grid, faster fall, glow, and a layer of static.
+var coderainCCRUHue = 138 // fallback only, used before the cipher list exists
+
+// The wash sits behind the glyphs and takes the same hue, so switching cipher
+// re-tints the whole field rather than just the characters.
+function coderainCCRUBg(alpha) {
+	var hue = coderainCCRUHue
+	if (typeof cipherList !== "undefined" && typeof getCodeRainColor === "function") {
+		hue = getCodeRainColor().h
+	}
+	return "hsla(" + hue + ", 55%, 7%, " + alpha + ")"
+}
+
+function matrixCCRU() {
+
+	var maxRow = h / coderainCellH
+
+	ctx.globalCompositeOperation = "source-over"
+	ctx.shadowBlur = 0
+	ctx.shadowColor = "hsla(0,0%,0%,0)"
+	ctx.fillStyle = coderainCCRUBg(coderainFadeAlpha)
+	ctx.fillRect(0, 0, w, h)
+
+	// CCRU tracks the selected cipher like the standard style does, but keeps
+	// its own neon treatment: saturation and lightness are forced high rather
+	// than taken from the cipher, so it always reads as neon rather than muted.
+	var H = getCodeRainColor().h
+	var trailCol = "hsl(" + H + ", 90%, 34%)"
+	var headCol  = "hsl(" + (H + 12) + ", 100%, 72%)"
+	var staticCol = "hsla(" + (H + 20) + ", 100%, 78%, 0.55)"
+
+	ctx.font = "600 12px " + coderainFontStack
+	ctx.textBaseline = "top"
+
+	var aLen = coderainCCRUGlyphs.length
+	var slow = coderainReducedMotion ? 0.25 : 1
+
+	for (var i = 0; i < coderainDrops.length; i++) {
+		var drop = coderainDrops[i]
+		var prevRow = Math.floor(drop.row)
+		drop.row += drop.speed * slow
+		var newRow = Math.floor(drop.row)
+
+		if (newRow === prevRow) continue
+		if (newRow < 0) continue
+
+		var x = i * coderainCellW
+		var y = newRow * coderainCellH
+
+		if (prevRow >= 0) {
+			ctx.shadowBlur = 0
+			ctx.fillStyle = trailCol
+			ctx.fillText(coderainCCRUGlyphs[rndInt(0, aLen - 1)], x, prevRow * coderainCellH)
+		}
+
+		// neon head: bright core with a glow behind it
+		ctx.shadowColor = "hsla(" + H + ", 100%, 55%, 0.9)"
+		ctx.shadowBlur = 8
+		ctx.fillStyle = headCol
+		ctx.fillText(coderainCCRUGlyphs[rndInt(0, aLen - 1)], x, y)
+		ctx.shadowBlur = 0
+
+		if (newRow > maxRow) {
+			drop.row = -Math.random() * maxRow * 0.3
+			drop.speed = coderainSpeed()
+		}
+	}
+
+	// static: scattered neon glyphs that flare and decay with the wash, so the
+	// field never sits still between the falling columns
+	var staticCount = Math.max(12, Math.floor(cols * 0.5))
+	ctx.shadowColor = "hsla(" + H + ", 100%, 60%, 0.8)"
+	ctx.shadowBlur = 6
+	ctx.fillStyle = staticCol
+	for (var s = 0; s < staticCount; s++) {
+		var sx = Math.floor(Math.random() * cols) * coderainCellW
+		var sy = Math.floor(Math.random() * maxRow) * coderainCellH
+		ctx.fillText(coderainCCRUGlyphs[rndInt(0, aLen - 1)], sx, sy)
+	}
+	ctx.shadowBlur = 0
 }
 
 function matrixNew() {
@@ -295,9 +421,15 @@ function toggleCodeRain() {
 	return
 }
 
+// "Background" is too long for the nav row, so the falling-rain glyph carries
+// the meaning and only the state is spelled out
+var coderainGlyphIcon = "⇊"
+
 function coderainStateLabel() {
-	if (!optMatrixCodeRain) return "Background: Off"
-	return (coderainStyle === "retro") ? "Background: Retro" : "Background: On"
+	if (!optMatrixCodeRain) return coderainGlyphIcon + " Off"
+	if (coderainStyle === "retro") return coderainGlyphIcon + " Retro"
+	if (coderainStyle === "ccru") return coderainGlyphIcon + " CCRU"
+	return coderainGlyphIcon + " On"
 }
 
 // keeps the on-page toggle button and the Options checkbox showing the same state
@@ -305,18 +437,21 @@ function updateCodeRainToggleBtn() {
 	var btn = document.getElementById("bgToggleBtn")
 	if (btn !== null) {
 		btn.textContent = coderainStateLabel()
-		btn.classList.remove("bgToggleOff", "bgToggleRetro")
+		btn.title = "Background code rain: " + (optMatrixCodeRain ? coderainStyle : "off") + " (click to cycle Off, On, Retro, CCRU)"
+		btn.classList.remove("bgToggleOff", "bgToggleRetro", "bgToggleCCRU")
 		if (!optMatrixCodeRain) btn.classList.add("bgToggleOff")
 		else if (coderainStyle === "retro") btn.classList.add("bgToggleRetro")
+		else if (coderainStyle === "ccru") btn.classList.add("bgToggleCCRU")
 	}
 	var chk = document.getElementById("chkbox_MCR")
 	if (chk !== null) chk.checked = optMatrixCodeRain
 }
 
-// nav button: Off -> On (new) -> Retro -> Off
+// nav button: Off -> On (new) -> Retro -> CCRU -> Off
 function toggleCodeRainBtn() {
 	if (!optMatrixCodeRain) { optMatrixCodeRain = true; coderainStyle = "new" }
 	else if (coderainStyle === "new") { coderainStyle = "retro" }
+	else if (coderainStyle === "retro") { coderainStyle = "ccru" }
 	else { optMatrixCodeRain = false; coderainStyle = "new" }
 	toggleCodeRain()
 }
