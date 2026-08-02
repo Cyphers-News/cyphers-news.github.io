@@ -213,6 +213,181 @@ body {
 	text-align: center;
 	padding-right: 0.4em;
 }
+/*             Astrology Panel                */
+/* ########################################## */
+
+.astroBG {
+	max-width: 780px;
+}
+.astroIntro {
+	font-size: 85%;
+	color: var(--font-white-3);
+	padding: 0em 0.5em 0.9em 0.5em;
+	max-width: 46em;
+}
+.astroStep {
+	font-size: 92%;
+	font-weight: 600;
+	color: var(--focus-outline);
+	text-align: left;
+	padding: 0.6em 0.5em 0.5em 0.5em;
+	border-bottom: 1px solid var(--separator-accent2);
+	margin-bottom: 0.7em;
+}
+.astroNote {
+	font-size: 82%;
+	color: var(--font-white-3);
+	padding: 0.3em 0.5em;
+}
+.astroWarn {
+	color: hsl(35 80% 65%);
+}
+.astroInputTable td {
+	padding: 0em 0.35em 0.4em 0em;
+	text-align: left;
+	vertical-align: middle;
+}
+.astroInput {
+	width: 62px;
+	font-size: 90%;
+	color: var(--font-white-1);
+	border: 1px solid var(--border-accent);
+	box-sizing: border-box;
+	font-family: var(--font-family-mono), monospace;
+	background-color: var(--input-bg-accent);
+	padding: 0.2em 0.3em;
+	margin-left: 0.35em;
+}
+.astroTable {
+	border-spacing: 0px;
+	width: 100%;
+	margin-bottom: 0.5em;
+}
+.astroTable td {
+	padding: 0.28em 0.6em;
+	font-size: 95%;
+	border-bottom: 1px solid var(--border-dark-accent);
+}
+.astroHeadRow td {
+	font-size: 78%;
+	font-weight: 600;
+	color: var(--font-white-3);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+.astroTable tr:nth-child(odd) td {
+	background: var(--table-row-odd);
+}
+.astroTable tr:nth-child(even) td {
+	background: var(--table-row-even);
+}
+.astroTable tr.astroHeadRow td {
+	background: var(--hist-header-gradient);
+}
+.astroExact td {
+	background: var(--highlight-date) !important;
+}
+.astroGlyph {
+	font-size: 125%;
+	padding-right: 0.4em;
+	vertical-align: -1px;
+}
+.astroBody, .astroSign, .astroAspName {
+	font-weight: 500;
+	white-space: nowrap;
+}
+.astroBody, .astroSign, .astroAspName, .astroPhaseName {
+	cursor: pointer;
+}
+.astroBody:hover, .astroSign:hover, .astroAspName:hover, .astroPhaseName:hover {
+	color: var(--font-white-1);
+	text-decoration: underline;
+}
+.astroDeg {
+	font-family: var(--font-family-mono), monospace;
+	text-align: right;
+	white-space: nowrap;
+}
+.astroEl, .astroMotion {
+	font-size: 88%;
+	color: var(--font-white-3);
+}
+.astroRetro {
+	color: hsl(10 75% 68%);
+	font-weight: 600;
+}
+.astroPhase {
+	padding: 0.6em 0.5em 0.2em 0.5em;
+}
+.astroPhaseName {
+	font-size: 115%;
+	font-weight: 600;
+	color: var(--font-white-1);
+	padding-right: 0.8em;
+}
+.astroPhaseNum {
+	font-size: 85%;
+	color: var(--font-white-3);
+	padding-right: 0.8em;
+}
+
+/*            Encoding Menu Steps             */
+/* ########################################## */
+
+.encIntro {
+	font-size: 85%;
+	color: var(--font-white-3);
+	padding: 0em 0.5em 0.9em 0.5em;
+	max-width: 46em;
+}
+.encStep {
+	font-size: 92%;
+	font-weight: 600;
+	color: var(--focus-outline);
+	text-align: left;
+	padding: 0em 0.5em 0.5em 0.5em;
+	border-bottom: 1px solid var(--separator-accent2);
+	margin-bottom: 0.7em;
+}
+.encStepNote {
+	font-size: 88%;
+	font-weight: 500;
+	color: var(--font-white-3);
+	padding-left: 0.7em;
+}
+.encSubNote {
+	font-size: 82%;
+	color: var(--font-white-3);
+	padding: 0em 0.5em 0.4em 0.5em;
+	max-width: 40em;
+	text-align: center;
+}
+
+.colCtrlHint {
+	font-size: 82%;
+	color: var(--font-white-3);
+	padding: 0em 0.5em 0.2em 0.5em;
+	max-width: 44em;
+}
+.colCtrlHead {
+	font-size: 76%;
+	font-weight: 600;
+	color: var(--font-white-3);
+	text-align: center;
+	padding-bottom: 0.15em;
+}
+.cipherSwatch { /* live result colour, click to open the OS picker */
+	width: 34px;
+	height: 21px;
+	padding: 0;
+	border: 1px solid var(--border-accent);
+	background-color: transparent;
+	cursor: pointer;
+	vertical-align: middle;
+}
+.cipherSwatch::-webkit-color-swatch-wrapper { padding: 1px; }
+.cipherSwatch::-webkit-color-swatch { border: none; }
+.cipherSwatch::-moz-color-swatch { border: none; }
 #enabledCiphTable {
 	width: 100%;
 	padding: 1em 0em 0em 0em;
@@ -318,7 +493,26 @@ body {
 	height: 100%;
 	top:0;
 	left:0;
-	z-index : -1; /* behind all elements */ 
+	z-index : -1; /* behind all elements */
+}
+
+/* ---- background toggle (last item in the nav row) ---- */
+.dropbtn.bgToggleBtn {
+	font-size: 82%;
+	opacity: 0.7;
+	cursor: pointer;
+	padding: 0.4em 0.8em;
+}
+.dropbtn.bgToggleBtn:hover {
+	opacity: 1;
+	background-color: var(--btn-hover-accent);
+}
+.dropbtn.bgToggleBtn.bgToggleOff {
+	opacity: 0.45;
+}
+.dropbtn.bgToggleBtn.bgToggleRetro { /* third state, distinct from plain On */
+	opacity: 1;
+	color: var(--checkmark-accent);
 }
 .ciphCheckbox {
 }
@@ -534,6 +728,13 @@ body {
 	text-align: center;
 	padding-bottom: 1em;
 }
+.ChartChar, .ChartVal, #spaceChartBtn, #capsNameChartBtn, #backspaceChartBtn {
+	cursor: pointer;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
 
 /*        Buttons, Text Boxes, Controls       */
 /* ########################################## */
@@ -742,23 +943,39 @@ body {
 	font-family: var(--font-family), "Arial", sans-serif;
 	outline: none;
 	background-color: var(--btn-bg-accent);
-	background-color: transparent;
+	/*background-color: transparent;*/
 }
 .intBtn2, .ciphEditBtn { /* Cipher Categories */
-	display: inline-block;
-	color: var(--font-white-1);
-	color: var(--font-white-2);
-	padding: 0.2em 0.75em;
-	margin: 0.1em 0em;
-	border: 1px solid var(--border-accent);	  
-	width: 100%;
-	font-size: 100%;
-	font-weight: 500;
-	font-family: var(--font-family), "Arial", sans-serif;
-	outline: none;
-	background-color: var(--btn-bg-accent);
-	background-color: transparent;
+    display: inline-block;
+    color: var(--font-white-1);
+    color: var(--font-white-2);
+    padding: 0.15em 0.6em; /* Padding for breathing room */
+    margin: 0.1em 0.05em; /* Margin for subtle spacing */
+    border: 1px solid var(--border-accent);	  
+    width: 100%;
+    font-size: 100%;
+    font-weight: 500;
+    font-family: var(--font-family), "Arial", sans-serif;
+    outline: none;
+    background-color: var(--btn-bg-accent);
+
+    /* Default behavior for short text (no wrapping) */
+    white-space: nowrap; /* Prevent wrapping by default */
+    overflow-wrap: normal; /* Don't break words unnecessarily */
+    text-align: center; /* Center-align the text */
+    line-height: 1.2; /* Line height for readability */
+    min-height: auto; /* Allow dynamic height */
 }
+
+/* Special class for "Gematria Club" that needs wrapping */
+.intBtn2.gematriaClub {
+    white-space: normal; /* Allow wrapping */
+    overflow-wrap: break-word; /* Break words if necessary */
+    font-size: 90%; /* Slightly smaller text */
+    padding: 0.15em 0.5em; /* Adjust padding for longer text */
+    max-width: 180px; /* Optional: Limit the width */
+}
+
 .ciphEditBtn {
 	width: auto;
 	margin: 0.75em 0.5em 0em 0.5em;
@@ -776,7 +993,7 @@ body {
 	font-family: var(--font-family), "Arial", sans-serif;
 	outline: none;
 	background-color: var(--btn-bg-accent);
-	background-color: transparent;
+	/*background-color: transparent;*/
 }
 @media (max-width: 911px) { /* mobile */
 	#queryDBbtn {
@@ -824,6 +1041,7 @@ body {
 	margin: 0em 0em 0em 0.3em;
 	min-width: 30px;
 	max-width: 30px;
+	color: var(--border-accent);
 }
 #calcNotification {
 	position: absolute;
@@ -857,6 +1075,9 @@ body {
 	font-weight: 500;
 	outline: none;
 }
+.dropbtn.dateCalcTab { /* same size as the other tabs, just slightly brighter */
+	color: var(--font-white-1);
+}
 .optionElementTable {
 	border-spacing: 0;
 	text-align: center;
@@ -874,8 +1095,9 @@ body {
 	padding: 0.3em;
 }
 .enterAsWordsLimit {
-	border: 1px solid var(--border-accent);
 	text-align: right;
+	border: 1px solid var(--border-accent);
+	background-color: var(--btn-bg-accent);
 	color: var(--font-white-2);
 	font-weight: 500;
 	width: 100%;
@@ -898,7 +1120,7 @@ body {
 .optionTableLabel {
 	font-size: 80%;
 }
-#phrLimitBox, #dbPageItemsBox, #dbScrollItemsBox {
+#phrLimitBox, #dbPageItemsBox, #dbScrollItemsBox, #iScaleBox {
 	width: 50px;
 	border: none;
 	color: var(--font-white-2);
@@ -1005,6 +1227,57 @@ body {
 .imgDataArea {
 	display: grid;
 	place-items: center;
+	overflow: auto;
+}
+.imgDataArea img { /* wide breakdowns used to overflow the preview and get clipped */
+	max-width: 100%;
+	height: auto;
+}
+
+/*        Word Breakdown Export Styling       */
+/* ########################################## */
+
+.breakExportHeader {
+	text-align: center;
+	padding: 0.2em 1em 0.9em 1em;
+}
+.breakExportPhrase {
+	font-size: 155%;
+	font-weight: 600;
+	color: var(--font-white-1);
+	line-height: 1.25em;
+	max-width: 34em; /* wraps between words instead of running off the image */
+	margin: 0 auto;
+	overflow-wrap: break-word;
+}
+.breakExportMeta {
+	padding-top: 0.35em;
+}
+.breakExportTotal {
+	font-size: 175%;
+	font-weight: 600;
+	color: var(--font-white-1);
+	padding-right: 0.4em;
+}
+.breakExportCiph {
+	font-size: 120%;
+	font-weight: 500;
+}
+.breakExportMode { /* applied to #BreakdownSpot only while the image is captured */
+	background-color: var(--body-bg-accent); /* solid, so the PNG is not transparent */
+	padding: 1.1em 1.4em 1.2em 1.4em;
+	border: 1px solid var(--border-dark-accent);
+}
+.breakExportMode .BreakVal,
+.breakExportMode .BreakValDark { /* dim grey values were the main legibility complaint */
+	color: var(--font-white-2);
+	font-size: 80%;
+}
+.breakExportMode .BreakChar {
+	font-size: 125%;
+}
+.breakExportMode .LetterCounts {
+	padding-bottom: 0.4em;
 }
 #downImgBtn:hover, .refreshImgBtn:hover { background-color: var(--btn-hover-accent); }
 #downImgBtn:active, .refreshImgBtn:active { background-color: var(--btn-active-accent); }
@@ -1202,10 +1475,17 @@ body {
 .dateCalcTable {
 	margin: auto;
 }
-.dateCalcTable2 {
-	line-height: 0.8em;
+.dateCalcTable2 { /* the From/to results box, sized up for readability */
+	line-height: 1.05em;
 	padding: 1em 1em 0.9em 1em;
 	background: var(--btn-bg-accent);
+}
+.dateCalcTable2 .dateDescription { /* "From" / "to" labels */
+	font-size: 100%;
+}
+.dateCalcTable2 .dateDetailsText { /* the dates themselves and the duration lines */
+	font-size: 118%;
+	font-weight: 500;
 }
 .elemBorderScr {
 	border: 1px solid var(--border-dark-accent);

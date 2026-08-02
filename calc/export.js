@@ -1,10 +1,59 @@
 // ============================= Export =============================
 
+// ---- Word Breakdown export prep -------------------------------------
+//
+// The exported breakdown used to capture only #BreakTableContainer, which is
+// the letter grid alone. Long phrases wrap across grid rows, so the image read
+// as a sentence chopped into pieces with no way to tell what the phrase was,
+// which cipher produced it, or what it totalled. We now capture #BreakdownSpot
+// and stamp a header on it so the image is self-describing.
+
+function breakdownExportHeader() {
+	var i, curCipher = null
+	for (i = 0; i < cipherList.length; i++) {
+		if (cipherList[i].cipherName == breakCipher) { curCipher = cipherList[i]; break }
+	}
+	if (curCipher === null) return ""
+
+	var phrase = breakPhraseText
+	var total = breakPhraseTotal
+	if (phrase === "") { // fall back to the input box if the breakdown never ran
+		phrase = (optAllowPhraseComments) ? sValNoComments() : sVal()
+		total = curCipher.calcGematria(sVal())
+	}
+	var col = (optColoredCiphers) ? 'color: hsl('+curCipher.H+' '+curCipher.S+'% '+curCipher.L+'% / 1);' : ''
+
+	var o = '<div class="breakExportHeader">'
+	o += '<div class="breakExportPhrase">'+phrase+'</div>'
+	o += '<div class="breakExportMeta">'
+	o += '<span class="breakExportTotal">'+total+'</span>'
+	o += '<span class="breakExportCiph" style="'+col+'">'+curCipher.cipherName+gemCalcModeLabel(curCipher)+'</span>'
+	o += '</div>'
+	o += '</div>'
+	return o
+}
+
+function prepBreakdownExport() {
+	// hide the app's own compact line, the header replaces it
+	$('#SimpleBreak').addClass('hideValue')
+	$('#BreakdownSpot').prepend(breakdownExportHeader())
+	$('#BreakdownSpot').addClass('breakExportMode') // solid bg + higher contrast values
+}
+
+function restoreBreakdownExport() {
+	$('.breakExportHeader').remove()
+	$('#BreakdownSpot').removeClass('breakExportMode')
+	$('#SimpleBreak').removeClass('hideValue')
+}
+
 function openImageWindow(element, imgName = "", sRatio = window.devicePixelRatio, refresh = false) { // sRatio is scaling, refresh - update the image only
 	var imageDataURL, wnd, scl
 	if ( $(element).length ) { // if specified element exists
 		// if browser zoom level is more than passed value, use current zoom level
-		if (typeof sRatio !== 'undefined' && sRatio < window.devicePixelRatio) { sRatio = window.devicePixelRatio}
+		if (isNaN(sRatio)) { sRatio = window.devicePixelRatio }
+		if (element == '#ChartSpot') { // remove space and backspace labels from Cipher Chart
+			$('#spaceChartBtn').text('');$('#backspaceChartBtn').text('');
+		}
 		// html2canvas($(element)[0], {allowTaint: false, backgroundColor: window.getComputedStyle(document.querySelector('body')).getPropertyValue('background-color'), width: $(element).outerWidth()+2, height: $(element).outerHeight()+2, scale: sRatio} ).then((canvas) => { // e.g. html2canvas($("#ChartTable")[0]).then ...
 		html2canvas($(element)[0], {allowTaint: false, backgroundColor: "rgba(0,0,0,0)", width: $(element).outerWidth()+10, height: $(element).outerHeight()+10, scale: sRatio} ).then((canvas) => { // e.g. html2canvas($("#ChartTable")[0]).then ...
 			//allowTaint: true, backgroundColor: "rgba(22,26,34,1.0)" - render white bg as transparent
@@ -26,6 +75,8 @@ function openImageWindow(element, imgName = "", sRatio = window.devicePixelRatio
 				$('#BreakdownDetails').removeClass('elemBorderScr') // remove outline for breakdown area
 				updateWordBreakdown() // redraw cipher chart
 			}
+
+			if (element == '#BreakdownSpot') restoreBreakdownExport() // strip the export-only header
 
 			imgName = imgName.replace(/'/g, '')
 			if (imgName == "" || imgName.length >= 200) imgName = getTimestamp()+".png"; // filename for download button (200 char limit)

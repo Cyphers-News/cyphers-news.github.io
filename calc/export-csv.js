@@ -35,13 +35,14 @@ function processDateFile(userHist) { // calculated date durations for imported f
 	download(getTimestamp()+"_GEMATRO_DATES.txt", t); // download file
 }
 	
-function importFileAction(file) {
-	var reader = new FileReader()
-	
-	var sb = "" // string builder
-	reader.onload = (event) => { // actions to perform after file is read
-		file = event.target.result // full file contents
+function importFileAction(file, hasLocalFile) {
+	var reader = new FileReader();
+	var sb = ""; // string builder
+
+	var execute = function() {
 		var userHist = file.split(/\r\n|\n/) // to string array, line break as separator
+
+		//console.log('test');
 		
 		//userHist.forEach((line) => { // print line by line
 		//	console.log(line)
@@ -102,7 +103,9 @@ function importFileAction(file) {
 				cipherList.push(eval("new cipher("+ciph[n].slice(1,-1)+")")) // remove parethesis, evaluate string as javascript code
 			}
 			document.getElementById("calcOptionsPanel").innerHTML = "" // clear menu panel
-			initCalc() // reinit
+			
+			initCalc() // reinit.
+			
 			updateTables() // update tables
 			updateInterfaceColor(true) // update interface color (first run)
 			if (userDBlive.length !== 0) { // restore controls if live database is loaded
@@ -207,11 +210,25 @@ function importFileAction(file) {
 		updateTables() // update tables after all lines are added
 	}
 
-	reader.onerror = (event) => {
-		alert(event.target.error.name)
-	};
+	if (hasLocalFile) {
+		execute();
+	} else {
+		reader.onload = (event) => { // actions to perform after file is read
+			file = event.target.result // full file contents
+			execute();
+		}
 
-	reader.readAsText(file) // issue command to start reading file
+		reader.onerror = (event) => {
+			alert(event.target.error.name)
+		};
+	
+		reader.readAsText(file) // issue command to start reading file
+	}
+
+	
+	
+	
+	
 }
 
 function isJsonString(str) {

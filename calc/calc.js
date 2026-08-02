@@ -22,7 +22,7 @@ var dateCalcMenuOpened = false // date calculator menu state
 var encodingMenuOpened = false // encoding menu state
 
 var enabledCiphCount = 0 // number of enabled ciphers
-var optShowExtraCiphers = false // enable extra ciphers
+var optShowExtraCiphers = true // enable extra ciphers
 
 // Cipher colors
 var origColors = [] // preserve original cipher colors
@@ -37,11 +37,12 @@ var optNewPhrasesGoFirst = false // new phrases are inserted at the beginning of
 var optCompactCiphCount = 8 // compact mode threshold
 var optLoadUserHistCiphers = true // load ciphers when CSV file is imported
 
-var optMatrixCodeRain = false // code rain
+var optMatrixCodeRain = true // code rain
+var optCoderainFollowCipher = true // code rain borrows the hue of the active cipher
 
 var optShowOnlyMatching = false // set opacity of nonmatching values to zero
 
-var optNumCalcMethod = 1 // 0 - "Off", 1 - "Full", 2 - "Reduced"
+var optNumCalcMethod = 2 // 0 - "Off", 1 - "Full", 2 - "Reduced"
 var optLetterWordCount = true // show word/letter count
 var optCompactBreakdown = true // compact breakdown - "phrase = 67 (English Ordinal)" is not included inside the chart
 var optWordBreakdown = true // word breakdown
@@ -51,8 +52,8 @@ var optGemSubstitutionMode = true // simple substitution of characters with corr
 var optGemMultCharPos = false // value of each character is multiplied by character index
 var optGemMultCharPosReverse = false // value of each character is multiplied by character index in reverse order
 
-var optFiltSameCipherMatch = false // filter shows only phrases that match in the same cipher
-var optFiltCrossCipherMatch = true // filter shows only ciphers that have matching values
+var optFiltSameCipherMatch = true // filter shows only phrases that match in the same cipher
+var optFiltCrossCipherMatch = false // filter shows only ciphers that have matching values
 var alphaHlt = 0.15 // opacity for values that do not match - change value here and in conf_SOM()
 
 var optAllowPhraseComments = true // allow phrase comments, text inside [...] is not evaluated
@@ -85,6 +86,8 @@ var coderainSatDefault = 0.2
 var coderainLit = 0.19  // coderain lightness
 var coderainLitDefault = 0.19
 
+var optImageScale = 1.0 // image scaling factor for screenshots
+
 var calcOptionsArr = [ // used to export/import settings
 	"'optNumCalcMethod'+' = '+optNumCalcMethod",
 	"'optFiltCrossCipherMatch'+' = '+optFiltCrossCipherMatch",
@@ -101,6 +104,8 @@ var calcOptionsArr = [ // used to export/import settings
 	"'optGradientCharts'+' = '+optGradientCharts",
 	"'optLoadUserHistCiphers'+' = '+optLoadUserHistCiphers",
 	"'optMatrixCodeRain'+' = '+optMatrixCodeRain",
+	"'optCoderainFollowCipher'+' = '+optCoderainFollowCipher",
+	"'coderainStyle'+' = '+JSON.stringify(coderainStyle)",
 	"'interfaceHue'+' = '+interfaceHue",
 	"'interfaceSat'+' = '+interfaceSat",
 	"'interfaceLit'+' = '+interfaceLit",
@@ -120,15 +125,13 @@ var calcOptionsArr = [ // used to export/import settings
 	"'optGemMultCharPosReverse'+' = '+optGemMultCharPosReverse",
 	'"encDefAlphArr"+" = \x27"+String(encPrevAlphStr).replace(/,/g,"")+"\x27"',
 	'"encDefVowArr"+" = \x27"+String(encPrevVowStr).replace(/,/g,"")+"\x27"',
-	'"encDefExcLetArr"+" = \x27"+String(encPrevExcLetStr).replace(/,/g,"")+"\x27"'
+	'"encDefExcLetArr"+" = \x27"+String(encPrevExcLetStr).replace(/,/g,"")+"\x27"',
+	"'optImageScale'+' = '+optImageScale"
 ]
 
 var runOnceRestoreCalcSet = true
 function initCalc(defSet = false) { // run after page has finished loading
 	configureCalcInterface(true)
-	if (navigator.userAgent.match('Android')) {
-		$('#enterPhraseBtn').removeClass('hideValue') // "Enter" button for Android devices
-	}
 	if (defSet && typeof calcOpt !== 'undefined') importCalcOptions(calcOptions); // load settings from ciphers.js
 	generateRndColors()
 	if (runOnceRestoreCalcSet && window.localStorage.getItem('userCalcSettings') !== null) {
@@ -138,7 +141,7 @@ function initCalc(defSet = false) { // run after page has finished loading
 	createCalcMenus()
 	enableDefaultCiphers()
 	saveCalcSettingsLocalStorage(true) // save default settings
-	showWelcomeMessage("Join our new Discord server!")
+	showWelcomeMessage("Query To Search Database")
 }
 
 var welcomeShown = false
@@ -156,7 +159,7 @@ function configureCalcInterface(initRun = false) { // switch interface layout (d
 		clearInterval(code_rain) // reset previous instance
 		document.getElementById("canv").style.display = "none"
 		initCodeRain() // recalculate canvas size
-		code_rain = setInterval(matrix, 50)
+		code_rain = setInterval(matrix, coderainFrameInterval())
 		document.getElementById("canv").style.display = ""
 	}
 	if ($(window).width() < compactViewportWidth) { // viewport width (mobile)
@@ -182,7 +185,6 @@ function configureCalcInterface(initRun = false) { // switch interface layout (d
 		enabledCiphColumns = 2
 	}
 }
-
 window.addEventListener('resize', function(){ // update interface on window resize
 	if (!mobileUserAgent && navigator.maxTouchPoints <= 1) { // touch keyboard on Windows devices changes window size
 		configureCalcInterface();
@@ -203,8 +205,12 @@ function createCalcMenus() {
 	createCiphersMenu()
 	createOptionsMenu()
 	createFeaturesMenu()
+	createFindMatchesMenu()
+	createDateCalcMenu()
+	createAstrologyMenu()
 	createExportMenu()
 	createAboutMenu()
+	createBgToggleButton()
 }
 
 function closeAllOpenedMenus() {
@@ -212,6 +218,7 @@ function closeAllOpenedMenus() {
 	if (dateCalcMenuOpened) toggleDateCalcMenu() // Date Calculator
 	if (editCiphersMenuOpened) toggleEditCiphersMenu() // Edit Ciphers
 	if (encodingMenuOpened) toggleEncodingMenu() // Encoding
+	if (typeof astroMenuOpened !== "undefined" && astroMenuOpened) toggleAstroMenu() // Astrology
 }
 
 // ========================= Random Colors ==========================
@@ -221,40 +228,44 @@ function generateRndColors() { rndCol.H = fillColArr(0, 359, 360/12); rndCol.S =
 function fillColArr(min, max, step) { var i; var a = []; for (i = min; i <= max; i += step) a.push(i); return a } // inclusive
 function getRndIndex(a) { return a[rndInt(0, a.length-1)] }
 
-// ========================== Ciphers Menu ==========================
+// ========================== Cyphers Menu ==========================
 
-function createCiphersMenu() { // create menu with all cipher catergories
-	var o = document.getElementById("calcOptionsPanel").innerHTML
+function createCiphersMenu() { // create menu with all cipher categories
+    var o = document.getElementById("calcOptionsPanel").innerHTML
 
-	o += '<div class="dropdown">'
-	o += '<button class="dropbtn">Ciphers</button>'
-	o += '<div class="dropdown-content" style="width: 380px;">'
+    o += '<div class="dropdown">'
+    o += '<button class="dropbtn">Cyphers</button>'
+    o += '<div class="dropdown-content" style="width: 380px;">'
 
-	o += '<div><center>'
-	o += '<input class="intBtn3" type="button" value="Empty" onclick="disableAllCiphers()">'
-	o += '<input class="intBtn3" type="button" value="Default" onclick="enableDefaultCiphers()">'
-	o += '<input class="intBtn3" type="button" value="All (EN)" onclick="enableAllEnglishCiphers()">'
-	o += '<input class="intBtn3" type="button" value="All" onclick="enableAllCiphers()">'
-	o += '</center></div>'
+    o += '<div><center>'
+    o += '<input class="intBtn3" type="button" value="Empty" onclick="disableAllCiphers()">'
+    o += '<input class="intBtn3" type="button" value="Default" onclick="enableDefaultCiphers()">'
+    o += '<input class="intBtn3" type="button" value="All (EN)" onclick="enableAllEnglishCiphers()">'
+    o += '<input class="intBtn3" type="button" value="All" onclick="enableAllCiphers()">'
+    o += '<input class="intBtn3" type="button" value="INTL" onclick="enableAllInternationalCiphers()" title="Enable every non-English cipher">'
+    o += '</center></div>'
 
-	o += '<hr style="background-color: var(--separator-accent2); height: 1px; border: none; margin: 0.4em;">'
+    o += '<hr style="background-color: var(--separator-accent2); height: 1px; border: none; margin: 0.4em;">'
 
-	o += '<div style="width: 30%; float: left;">'
-	for (i = 0; i < cCat.length; i++) {
-		o += '<input class="intBtn2 ciphCatButton" type="button" value="'+cCat[i]+'">'
-	}
+    o += '<div style="width: 30%; float: left;">'
+    for (i = 0; i < cCat.length; i++) {
+        let category = cCat[i];
+        // Apply 'gematriaClub' class only to the 'Gematria Club' category
+        let extraClass = category === "Gematria Club" ? " gematriaClub" : "";
+        o += '<input class="intBtn2 ciphCatButton' + extraClass + '" type="button" value="' + category + '">';
+    }
+    o += '</div>'
 
-	o += '</div>'
+    o += '<div style="width: 70%; float: left;">'
+    o += '<div id="menuCiphCatDetailsArea" style="margin: 0em 0.25em 0em 1.25em;">'
+    o += '</div></div>'
 
-	o += '<div style="width: 70%; float: left;">'
-	o += '<div id="menuCiphCatDetailsArea" style="margin: 0em 0.25em 0em 1.25em;">'
-	o += '</div></div>'
+    o += '</div></div>'
 
-	o += '</div></div>'
-
-	document.getElementById("calcOptionsPanel").innerHTML = o
-	displayCipherCatDetailed(cCat[0]) // open first available category
+    document.getElementById("calcOptionsPanel").innerHTML = o
+    displayCipherCatDetailed(cCat[0]) // open first available category
 }
+
 
 $(document).ready(function(){
 	$("body").on("mouseover", ".ciphCatButton", function () { // mouse over cipher category button
@@ -294,25 +305,80 @@ function createAboutMenu() { // create menu with all cipher catergories
 	o += '<button class="dropbtn">About</button>'
 	o += '<div class="dropdown-content dropdown-about">'
 
-	o += '<center><div class="gematroLogo">'+gematroSvgLogo()+'</div>'
-	o += '</center>'
-	o += '<div style="margin: 1em;"></div>'
-	o += '<input class="intBtn" type="button" value="Join Discord Server" onclick="gotoDiscordServer()">'
-	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="GitHub Repository" onclick="gotoGitHubRepo()">'
-	o += '<div style="margin: 0.5em;"></div>'
+	// o += '<center><div class="gematroLogo">'+gematroSvgLogo()+'</div>'
+	// o += '</center>'
+	// o += '<div style="margin: 1em;"></div>'
+	
 	o += '<input class="intBtn" type="button" value="Quickstart Guide" onclick="displayQuickstartGuide()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Contacts" onclick="displayContactInfo()">'
+	o += '<input class="intBtn" type="button" value="Coded By Gematro in 2021" onclick="gotoCodedByGematro()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Cyphers Repository in 2022" onclick="gotoCyphersRepo()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Hyperdope Repository in 2023" onclick="gotoGitHubRepo()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Gematria Research" onclick="gotoAlektryonBlog()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Ciphers News" onclick="gotoCiphersNews()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Cyphers Youtube" onclick="gotoCyphersYoutube()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Cyphers Discord" onclick="gotoDiscordServer()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Cyphers Twitter / X" onclick="gotoX()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Cyphers Database" onclick="gotoDatabase()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Gematro Calculator" onclick="gotoGematroCalculator()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Hyperdope Calculator" onclick="gotoHyperdopeBlog()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Gematrinator Calculator" onclick="gotoGEMATRINATOR()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Cyphers Webmaster Net Void" onclick="gotoNetVoid()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	
+
+
+	// o += '<div style="margin: 0.5em;"></div>'
+	// o += '<input class="intBtn" type="button" value="Contacts" onclick="displayContactInfo()">'
 
 	o += '</div></div>'
 
 	document.getElementById("calcOptionsPanel").innerHTML = o
 }
 
-function gotoGitHubRepo() { window.open("https://github.com/gematro/gematro.github.io", "_blank") }
+function gotoCodedByGematro() { window.open("https://github.com/gematro", "_blank") }
 
-function gotoDiscordServer() { window.open("https://discord.gg/th2ZxtQP7G", "_blank") }
+function gotoCyphersRepo() { window.open("https://github.com/CyphersNews/gematro-hyperdope", "_blank") }
+
+function gotoGitHubRepo() { window.open("https://github.com/malonehunter/hyperdope-gematria", "_blank") }
+
+function gotoAlektryonBlog () {window.open("https://gematriaresearch.blogspot.com/", "_blank") }
+
+function gotoCiphersNews () {window.open("https://ciphers.news", "_blank") }
+
+function gotoCyphersYoutube() { window.open("https://www.youtube.com/channel/UCg2_MXc1Q8AajN_n9kqIltQ", "_blank") }
+
+function gotoDiscordServer() { window.open("https://discord.gg/SJjN64x3h7", "_blank") }
+
+function gotoX() { window.open("https://twitter.com/CyphersNews", "_blank") }
+
+function gotoDatabase () {window.open("https://www.netvoid.tv/gematria", "_blank") }
+
+function gotoGematroCalculator() { window.open("https://gematro.github.io/", "_blank") }
+
+function gotoHyperdopeBlog () {window.open("https://calc.hyperdope.com/", "_blank") }
+
+function gotoGEMATRINATOR () {window.open("https://gematrinator.com/", "_blank") }
+
+function gotoNetVoid () {window.open("https://www.youtube.com/@NetVoid/featured", "_blank") }
+
+
+
+
+
+
 
 function gematroSvgLogo() {
 	return '<svg xmlns="http://www.w3.org/2000/svg" width="802.4" height="76.4" viewBox="0 0 2006 191"><defs><style>.cls-1 {fill: #bababa;fill-rule: evenodd;}</style></defs><path id="gematro_svg" data-name="gematroSVG" class="cls-1" d="M192.556,55.8L238,56l0.143-12.972q0-24.223-10.351-33.474T188.592,0.3H50.512q-29.07,0-39.31,9.47T0.961,45.23V145.873q0,26.21,10.24,35.676t39.31,9.47h138.08q29.07,0,39.31-9.47t10.241-35.676V80.026H116.8V113.94h75.757v40.522H47.429V35.32H192.556V55.8Zm332.1,135.218V155.343h-160.1V108.435h91.833V75.621H364.552V34h157.68V0.3H317.644V191.019H524.655Zm104.386,0V62.848l86.328,105.268h9.03L809.625,59.765V191.019h43.164V0.3H815.351L722.417,113.5,629.041,0.3H591.823V191.019h37.218Zm326.153,0,24-41.843H1105.39l24,41.843h52.19L1066.63,0.3h-44.71L908.726,191.019h46.468ZM1041.96,34.88l44.49,79.5H999.018Zm368.44-.44V0.3H1179.6V34.439h92.06v156.58h46.46V34.439h92.28Zm228.7,2.2q4.515,3.525,4.52,11.892V70.556q0,8.372-4.52,11.892t-16.63,3.524H1516.33V33.118h106.14Q1634.59,33.118,1639.1,36.642ZM1516.33,191.019V118.785h43.82l79.94,72.234h66.73l-90.73-72.234h26.2q23.565,0,34.14-8.588T1687,82.228V37.3q0-19.6-10.57-28.3t-34.14-8.7H1470.52V191.019h45.81Zm289.15-155.7H1959.2V154.462H1805.48V35.32Zm-46.47,110.553q0,26.21,10.13,35.676t39.42,9.47h147.55q29.07,0,39.31-9.47t10.24-35.676V45.23q0-25.983-10.02-35.456T1956.11,0.3H1808.56q-29.28,0-39.42,9.47T1759.01,45.23V145.873Z"/></svg>'
@@ -334,7 +400,7 @@ function createOptionsMenu() {
 	var CCMstate = ""; var SCMstate = ""; var SOMstate = ""; var SECstate = "";
 	var APCstate = ""; var LDMstate = ""; var NPGFstate = ""; var LWCstate = "";
 	var WBstate = ""; var CBstate = ""; var CCstate = ""; var GCstate = "";
-	var SWCstate = ""; var MCRstate = "";
+	var SWCstate = ""; var MCRstate = ""; var CFCstate = "";
 
 	if (optFiltCrossCipherMatch) CCMstate = "checked" // Cross Cipher Match
 	if (optFiltSameCipherMatch) SCMstate = "checked" // Same Cipher Match
@@ -355,13 +421,13 @@ function createOptionsMenu() {
 
 	if (optLoadUserHistCiphers) SWCstate = "checked" // Switch Ciphers (CSV)
 	if (optMatrixCodeRain) MCRstate = "checked" // Matrix Code Rain
+	if (optCoderainFollowCipher) CFCstate = "checked" // Rain Follows Cipher
 
 	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Matrix Code Rain<input type="checkbox" id="chkbox_MCR" onclick="conf_MCR()" '+MCRstate+'><span class="custChkBox"></span></label></div>'
+	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Rain Follows Cipher<input type="checkbox" id="chkbox_CFC" onclick="conf_CFC()" '+CFCstate+'><span class="custChkBox"></span></label></div>'
 	o += '<div style="margin: 1em"></div>'
-	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Cross Cipher Match<input type="checkbox" id="chkbox_CCM" onclick="conf_CCM()" '+CCMstate+'><span class="custChkBox"></span></label></div>'
-	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Same Cipher Match<input type="checkbox" id="chkbox_SCM" onclick="conf_SCM()" '+SCMstate+'><span class="custChkBox"></span></label></div>'
-	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Show Only Matching<input type="checkbox" id="chkbox_SOM" onclick="conf_SOM()" '+SOMstate+'><span class="custChkBox"></span></label></div>'
-	o += '<div style="margin: 1em"></div>'
+	// Cross Cipher Match / Same Cipher Match / Show Only Matching moved to the
+	// Find Matches menu, so they sit next to the button that acts on them
 	o += '<div class="optionElement" id="showExtraCiphOption"><label class="chkLabel ciphCheckboxLabel2">Show Extra Ciphers<input type="checkbox" id="chkbox_SEC" onclick="conf_SEC()" '+SECstate+'><span class="custChkBox"></span></label></div>'
 	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Ignore Comments [...]<input type="checkbox" id="chkbox_APC" onclick="conf_APC()" '+APCstate+'><span class="custChkBox"></span></label></div>'
 	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Live Database Mode<input type="checkbox" id="chkbox_LDM" onclick="conf_LDM()" '+LDMstate+'><span class="custChkBox"></span></label></div>'
@@ -510,6 +576,10 @@ function conf_MCR() { // Matrix Code Rain
 	toggleCodeRain()
 }
 
+function conf_CFC() { // Rain Follows Cipher
+	optCoderainFollowCipher = !optCoderainFollowCipher
+}
+
 function create_NumCalc() { // Number Calculation
 	var o = ""
 	var fullNumCalcState = ''; var redNumCalcState = ''; var offNumCalcState = '';
@@ -600,17 +670,19 @@ function createExportMenu() {
 	o += '<button class="dropbtn">Export</button>'
 	o += '<div class="dropdown-content">'
 
-	o += '<input id="btn-print-cipher-png" class="intBtn" type="button" value="Print Cipher Chart">' // cipher chart preview
+	o += '<input id="btn-print-cipher-png" class="intBtn" type="button" value="Print Cyphers Chart">' // cipher chart preview
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input id="btn-print-history-png" class="intBtn" type="button" value="Print History Table">' // history table preview
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input id="btn-print-word-break-png" class="intBtn" type="button" value="Print Word Breakdown">' // print word breakdown table
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input id="btn-print-breakdown-details-png" class="intBtn" type="button" value="Print Gematria Card">' // print detailed breakdown
+	o += '<input id="btn-print-breakdown-details-png" class="intBtn" type="button" value="Print Cyphers Card">' // print detailed breakdown
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input id="btn-num-props-png" class="intBtn" type="button" value="Print Number Properties">' // print number properties
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input id="btn-date-calc-png" class="intBtn" type="button" value="Print Date Durations">' // print date durations
+
+	o += '<div class="enterAsWordsLimit"><span class="optionTableLabel">Image scale</span><input id="iScaleBox" onchange="conf_iScale()" type="text" value="'+optImageScale.toFixed(1)+'"></div>' // image scale
 	
 	o += '<hr style="background-color: var(--separator-accent2); height: 1px; border: none; margin: 0.75em;">'
 
@@ -645,6 +717,10 @@ function createExportMenu() {
 	o += '</div></div>'
 	document.getElementById("calcOptionsPanel").innerHTML = o
 }
+function conf_iScale() { // image scale
+	var element = document.getElementById("iScaleBox")
+	optImageScale = Number(Number(element.value).toFixed(1)) // 1.0
+}
 
 // ========================= Color Functions ========================
 
@@ -657,8 +733,7 @@ function createFeaturesMenu() {
 
 	o += create_GemCalc() // Gematria Calculation method
 
-	o += '<input class="intBtn" type="button" value="Date Calculator" onclick="toggleDateCalcMenu()">'
-	o += '<div style="margin: 0.5em;"></div>'
+	// Date Calculator promoted to its own top-level button
 	o += '<input class="intBtn" type="button" value="Color Controls" onclick="toggleColorControlsMenu()">'
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input id="edCiphBtn" class="intBtn" type="button" value="Edit Ciphers" onclick="toggleEditCiphersMenu()">'
@@ -667,8 +742,7 @@ function createFeaturesMenu() {
 
 	o += '<hr style="background-color: var(--separator-accent2); height: 1px; border: none; margin: 0.75em;">'
 
-	o += '<input class="intBtn" type="button" value="Find Matches" onclick="updateHistoryTableAutoHlt()">'
-	o += '<div style="margin: 0.5em;"></div>'
+	// Find Matches promoted to its own top-level menu
 	o += '<input class="intBtn" type="button" value="Enter As Words" onclick="phraseBoxKeypress(35)">' // "End" keystroke
 	o += create_PL() // Phrase Limit (End)
 	o += '<div style="margin: 0.5em;"></div>'
@@ -681,6 +755,64 @@ function createFeaturesMenu() {
 	o += '</div></div>'
 	document.getElementById("calcOptionsPanel").innerHTML = o
 }
+
+// Top-level Find Matches tab. Clicking the tab itself runs the search; hovering
+// opens the dropdown with Reset Order and the three match filters, which used to
+// sit in Options far away from the button that acts on them.
+function createFindMatchesMenu() {
+	var o = document.getElementById("calcOptionsPanel").innerHTML
+
+	var CCMstate = ""; var SCMstate = ""; var SOMstate = "";
+	if (optFiltCrossCipherMatch) CCMstate = "checked"
+	if (optFiltSameCipherMatch) SCMstate = "checked"
+	if (optShowOnlyMatching) SOMstate = "checked"
+
+	o += '<div class="dropdown">'
+	o += '<button class="dropbtn" onclick="updateHistoryTableAutoHlt()">Find Matches</button>'
+	o += '<div class="dropdown-content" style="width: 210px; left: -55px;">'
+
+	// no Find Matches button here, the tab itself runs the search
+	o += '<input class="intBtn" type="button" value="Reset Order" onclick="clearHistMatchSort()">'
+
+	o += '<hr style="background-color: var(--separator-accent2); height: 1px; border: none; margin: 0.75em;">'
+
+	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Cross Cipher Match<input type="checkbox" id="chkbox_CCM" onclick="conf_CCM()" '+CCMstate+'><span class="custChkBox"></span></label></div>'
+	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Same Cipher Match<input type="checkbox" id="chkbox_SCM" onclick="conf_SCM()" '+SCMstate+'><span class="custChkBox"></span></label></div>'
+	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Show Only Matching<input type="checkbox" id="chkbox_SOM" onclick="conf_SOM()" '+SOMstate+'><span class="custChkBox"></span></label></div>'
+	o += '<div style="margin: 0.5em;"></div>'
+
+	o += '</div></div>'
+	document.getElementById("calcOptionsPanel").innerHTML = o
+}
+
+// Background on/off, rendered as the last item in the nav row. It lives inline
+// rather than absolutely positioned because the nav is centred and spans the
+// full width, so a floating button collides with it at most window sizes.
+function createBgToggleButton() {
+	var o = document.getElementById("calcOptionsPanel").innerHTML
+	var label = optMatrixCodeRain ? "Background: On" : "Background: Off"
+	var offClass = optMatrixCodeRain ? "" : " bgToggleOff"
+	o += '<button id="bgToggleBtn" class="dropbtn bgToggleBtn'+offClass+'" onclick="toggleCodeRainBtn()" title="Toggle the code rain background">'+label+'</button>'
+	document.getElementById("calcOptionsPanel").innerHTML = o
+}
+
+// Date Calculator as its own tab rather than an entry inside Features
+function createDateCalcMenu() {
+	var o = document.getElementById("calcOptionsPanel").innerHTML
+	o += '<div class="dropdown">'
+	o += '<button class="dropbtn dateCalcTab" onclick="toggleDateCalcMenu()">Date Calculator</button>'
+	o += '</div>'
+	document.getElementById("calcOptionsPanel").innerHTML = o
+}
+
+function createAstrologyMenu() {
+	var o = document.getElementById("calcOptionsPanel").innerHTML
+	o += '<div class="dropdown">'
+	o += '<button class="dropbtn dateCalcTab" onclick="toggleAstroMenu()">Astrology</button>'
+	o += '</div>'
+	document.getElementById("calcOptionsPanel").innerHTML = o
+}
+
 function create_PL() { // Phrase Limit (End)
 	var o = ""
 	o += '<div class="enterAsWordsLimit">'
@@ -711,8 +843,16 @@ function toggleColorControlsMenu(redraw = false) { // display control menu to ad
 		var o = '<div class="colorControlsBG">'
 		o += '<input class="closeMenuBtn" type="button" value="&#215;" onclick="closeAllOpenedMenus()">'
 
+		o += '<div class="colCtrlHint">Click a swatch to pick a colour. The three boxes are offsets from the cipher&#39;s default &#8212; Hue, Saturation, Lightness.</div>'
 		o += '<table class="ciphToggleContainer"><tbody>'
-		
+
+		// column headers, repeated once per layout column
+		o += '<tr class="colCtrlHeadRow">'
+		for (i = 0; i < colorMenuColumns; i++) {
+			o += '<td></td><td class="colCtrlHead">Hue</td><td class="colCtrlHead">Sat</td><td class="colCtrlHead">Light</td><td class="colCtrlHead">Colour</td><td></td>'
+		}
+		o += '</tr>'
+
 		for (i = 0; i < cipherList.length; i++) {
 			cur_ciph_index++
 			if (!new_row_opened) { // check if new row has to be opened
@@ -726,7 +866,7 @@ function toggleColorControlsMenu(redraw = false) { // display control menu to ad
 					o += '<td><input type="number" step="2" min="-360" max="360" value="'+chkboxColors[i].H+'" class="colSlider" id="sliderHue'+i+'" oninput="changeCipherColors(&quot;sliderHue'+i+'&quot;, &quot;Hue&quot;, '+i+')"></td>'
 					o += '<td><input type="number" step="1" min="-100" max="100" value="'+chkboxColors[i].S+'" class="colSlider" id="sliderSaturation'+i+'" oninput="changeCipherColors(&quot;sliderSaturation'+i+'&quot;, &quot;Saturation&quot;, '+i+')"></td>'
 					o += '<td><input type="number" step="1" min="-100" max="100" value="'+chkboxColors[i].L+'" class="colSlider" id="sliderLightness'+i+'" oninput="changeCipherColors(&quot;sliderLightness'+i+'&quot;, &quot;Lightness&quot;, '+i+')"></td>'
-					o += '<td><input type="text" value="" class="cipherColValueBox" id="cipherHSL'+i+'"></td>'
+					o += '<td><input type="color" class="cipherSwatch" id="cipherSwatch'+i+'" value="'+hslToHex(cipherList[i].H, cipherList[i].S, cipherList[i].L)+'" title="Pick a colour for '+cipherList[i].cipherName+'" oninput="setCipherColorFromPicker('+i+', this.value)"></td>'
 					o += '<td style="min-width: 16px;"></td>'
 					ciph_in_row++
 				}
@@ -976,11 +1116,77 @@ function changeCipherColors(elem_id, col_mode, cipher_index) {
 			else { chkboxColors[i].L = curVal }
 			cipherList[i].L = colFmt(origColors[i].L + chkboxColors[i].L + globColors.L,"L")
 		}
-		cur_ciphColBox = document.getElementById("cipherHSL"+i) // textbox with HSLA values for current color
-		if (cur_ciphColBox !== null) cur_ciphColBox.value = colPad(cipherList[i].H)+colPad(cipherList[i].S)+colPad(cipherList[i].L,true)
+		cur_ciphColBox = document.getElementById("cipherSwatch"+i) // live swatch for current color
+		if (cur_ciphColBox !== null) cur_ciphColBox.value = hslToHex(cipherList[i].H, cipherList[i].S, cipherList[i].L)
 	}
 	updateTables(false) // update without redrawing color controls
 	updateWordBreakdown() // update word/cipher breakdown table
+}
+
+// ---- Colour picker support ------------------------------------------
+//
+// Cipher colours are stored as offsets: final = origColors + chkboxColors +
+// globColors. That is why the raw number boxes are hard to reason about, you
+// are editing a delta and cannot see the result. These helpers let a swatch
+// show the real colour and translate a picked colour back into the offset.
+
+function hslToHex(h, s, l) {
+	h = ((h % 360) + 360) % 360; s = clampNum(s, 0, 100) / 100; l = clampNum(l, 0, 100) / 100
+	var c = (1 - Math.abs(2 * l - 1)) * s
+	var x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+	var m = l - c / 2
+	var r = 0, g = 0, b = 0
+	if (h < 60) { r = c; g = x }
+	else if (h < 120) { r = x; g = c }
+	else if (h < 180) { g = c; b = x }
+	else if (h < 240) { g = x; b = c }
+	else if (h < 300) { r = x; b = c }
+	else { r = c; b = x }
+	function hx(v) { var n = Math.round((v + m) * 255); return ("0" + n.toString(16)).slice(-2) }
+	return "#" + hx(r) + hx(g) + hx(b)
+}
+
+function hexToHsl(hex) {
+	var r = parseInt(hex.substr(1, 2), 16) / 255
+	var g = parseInt(hex.substr(3, 2), 16) / 255
+	var b = parseInt(hex.substr(5, 2), 16) / 255
+	var max = Math.max(r, g, b), min = Math.min(r, g, b)
+	var h = 0, s = 0, l = (max + min) / 2
+	var d = max - min
+	if (d !== 0) {
+		s = d / (1 - Math.abs(2 * l - 1))
+		if (max === r) h = 60 * (((g - b) / d) % 6)
+		else if (max === g) h = 60 * (((b - r) / d) + 2)
+		else h = 60 * (((r - g) / d) + 4)
+	}
+	if (h < 0) h += 360
+	return { H: Math.round(h), S: Math.round(s * 100), L: Math.round(l * 100) }
+}
+
+// Picked a colour for one cipher: store the delta that lands on it
+function setCipherColorFromPicker(i, hex) {
+	var target = hexToHsl(hex)
+	chkboxColors[i].H = target.H - origColors[i].H - globColors.H
+	chkboxColors[i].S = target.S - origColors[i].S - globColors.S
+	chkboxColors[i].L = target.L - origColors[i].L - globColors.L
+
+	cipherList[i].H = colFmt(origColors[i].H + chkboxColors[i].H + globColors.H, "H")
+	cipherList[i].S = colFmt(origColors[i].S + chkboxColors[i].S + globColors.S, "S")
+	cipherList[i].L = colFmt(origColors[i].L + chkboxColors[i].L + globColors.L, "L")
+
+	syncCipherColorInputs(i)
+	updateTables(false)
+	updateWordBreakdown()
+}
+
+// keep the number boxes and the swatch showing the same thing
+function syncCipherColorInputs(i) {
+	var el
+	el = document.getElementById("sliderHue" + i); if (el !== null) el.value = chkboxColors[i].H
+	el = document.getElementById("sliderSaturation" + i); if (el !== null) el.value = chkboxColors[i].S
+	el = document.getElementById("sliderLightness" + i); if (el !== null) el.value = chkboxColors[i].L
+	el = document.getElementById("cipherSwatch" + i)
+	if (el !== null) el.value = hslToHex(cipherList[i].H, cipherList[i].S, cipherList[i].L)
 }
 
 function colFmt(val, mode) { // normalize HSLA color values
@@ -1076,6 +1282,23 @@ function enableAllEnglishCiphers() {
 			cipherList[i].enabled = true
 			if (cur_chkbox !== null) cur_chkbox.checked = true
 		} else if (cipherList[i].cipherCategory !== "Extra" && cipherList[i].cArr.indexOf(97) > -1) { // lowercase "a", other cipher categories
+			cur_chkbox = document.getElementById("cipher_chkbox"+i)
+			cipherList[i].enabled = true
+			if (cur_chkbox !== null) cur_chkbox.checked = true
+		}
+	}
+	updateTables() // update
+}
+
+// categories whose alphabets are not plain English a-z, used by the INTL preset
+var internationalCipherCategories = ["Hebrew","Greek","Arabic","Russian","Armenian",
+	"Georgian","Persian","Devanagari","Japanese","Thai","Language"]
+
+function enableAllInternationalCiphers() {
+	prevCiphIndex = -1 // reset cipher selection
+	var cur_chkbox
+	for (i = 0; i < cipherList.length; i++) {
+		if (internationalCipherCategories.indexOf(cipherList[i].cipherCategory) > -1) {
 			cur_chkbox = document.getElementById("cipher_chkbox"+i)
 			cipherList[i].enabled = true
 			if (cur_chkbox !== null) cur_chkbox.checked = true
@@ -1379,7 +1602,7 @@ function phraseBoxKeypress(e) { // run on each keystroke inside text box - onkey
 
 function addPhraseToHistory(phr, upd) { // add new phrase to search history
 	var phrPos
-	if (phr !== "" && isNaN(phr)) { // if input is not empty and not a number
+	if (phr !== "" && isNaN(phr) || phr == "Infinity") { // if input is not empty and not a number
 		phrPos = sHistory.indexOf(phr);
 		if (phrPos > -1) { // if phrase is in history
 			sHistory.splice(phrPos, 1) // first remove it from array
@@ -1391,7 +1614,7 @@ function addPhraseToHistory(phr, upd) { // add new phrase to search history
 
 function addPhraseToHistoryUnshift(phr, upd) { // add new phrase to the beginning
 	var phrPos
-	if (phr !== "" && isNaN(phr)) { // if input is not empty and not a number
+	if (phr !== "" && isNaN(phr) || phr == "Infinity") { // if input is not empty and not a number
 		phrPos = sHistory.indexOf(phr);
 		if (phrPos > -1) { // if phrase is in history
 			sHistory.splice(phrPos, 1) // first remove it from array
@@ -1423,9 +1646,16 @@ function updateHistoryTable(hltBoolArr) {
 
 	var dispPhrase = "" // phrase to display inside history table
 	var tmpComment = ""; var commentMatch;
-	for (x = 0; x < sHistory.length; x++) {
 
-		if (x % 25 == 0 && enabledCiphCount !== 0) { // show header after each 25 phrases
+	// "Find Matches" can reorder rows so the most-matched phrases stack at the
+	// top. x stays the index into sHistory (row clicks and hltBoolArr depend on
+	// it), xi is the position on screen.
+	var dispOrder = (typeof getHistDisplayOrder === "function") ? getHistDisplayOrder() : null
+
+	for (var xi = 0; xi < sHistory.length; xi++) {
+		x = (dispOrder !== null) ? dispOrder[xi] : xi
+
+		if (xi % 25 == 0 && enabledCiphCount !== 0) { // show header after each 25 phrases
 			ms += '<tr class="cH"><td class="mP"></td>'
 			for (z = 0; z < cipherList.length; z++) {
 				if (cipherList[z].enabled) {

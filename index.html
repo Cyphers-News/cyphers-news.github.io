@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <head>
-<title>NETVOID - Gematria Calculator</title>
+<title>Calculator</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=520, maximum-scale=1, user-scalable=no">
-<link rel="shortcut icon" type="image/x-icon" href="res/favicon.ico">
+<link rel="shortcut icon" type="image/x-icon" href="res/favicon.png">
 
 <!-- Android Web App - Add to Home Screen -->
 <link rel="manifest" href="manifest.json">
@@ -27,19 +27,11 @@ $(window).load(function(){
 });
 </script>
 
-<!-- Global site tag (gtag.js) - Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-88C3M9GK4B"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-88C3M9GK4B');
-</script>
-
 </head>
 
-<body onload="initCalc(true)">
+<body>
+<!-- initCalc() needs to run before the db loads to create menu properly-->
+<!-- <body onload="initCalc(true)"> --> 
 
 <div id="loader"></div>
 <canvas id="canv"></canvas>
@@ -48,6 +40,11 @@ $(window).load(function(){
 <span style="font-family: 'Roboto Mono';"></span>
 
 <div id="calcMain">
+
+	<center>
+		<div id="mainLogo"></div>
+	</center>
+
 	<center>
 
 		<div id="calcOptionsPanel"></div>
@@ -55,11 +52,12 @@ $(window).load(function(){
 		<div id="colorControlsMenuArea"></div>
 		<div id="editCiphersMenuArea"></div>
 		<div id="dateCalcMenuArea"></div>
+		<div id="astroMenuArea"></div>
 
 		<div id="inputArea">
 		  <input id="queryDBbtn" class="hideValue" type="button" onclick="queryDatabase()" value="Query">
 		  <input id="phraseBox" autofocus type="text" spellcheck="false" autocomplete="off" oninput="updateEnabledCipherTable(); updateWordBreakdown(breakCipher,false,false);" onkeydown="phraseBoxKeypress(event.keyCode)" ondrop="dropHandler(event)" ondragover="dragOverHandler(event)">
-		  <input id="enterPhraseBtn" class="hideValue" type="button" onclick="phraseBoxKeypress(13);document.getElementById('phraseBox').focus()" value="&#x270E;">
+		  <input id="enterPhraseBtn" type="button" onclick="phraseBoxKeypress(13);document.getElementById('phraseBox').focus()" value="&#x270E;">
 		  <input id="highlightBox" type="text" spellcheck="false" autocomplete="off"><span id="clearFilterButton"></span>
 		</div>
 
@@ -87,6 +85,7 @@ $(window).load(function(){
 <script src="calc/num-prop.js"></script>
 <script src="calc/edit-ciphers.js"></script>
 <script src="calc/date-calc.js"></script>
+<script src="calc/astrology.js"></script>
 <script src="calc/database.js"></script>
 <script src="calc/quick-guide.js"></script>
 
@@ -96,5 +95,26 @@ $(window).load(function(){
 
 <script src="calc/coderain.js"></script>
 <script src="lib/html2canvas.min.js"></script>
+
+<!-- Initialzie the calculator.  This needs to run before loading a database or theme. -->
+<script>
+	initCalc(true);
+</script>
+
+<!-- AUTO LOAD DATABASE (DB) -->
+<!-- To change the word matching database reference a different file in the script below or append lines to db.txt -->
+
+<script>
+	var database = loadFile('db.txt');
+	importFileAction(database, true);
+</script>
+
+<!-- AUTO LOAD THEME -->
+<!-- To change the theme uncomment the script below -->
+
+<!-- <script>
+	var theme = loadFile('theme/white-interface.js');
+	importFileAction(theme, true);
+</script> -->
 
 </body>
