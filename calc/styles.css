@@ -257,6 +257,9 @@ body {
 	background-color: transparent;
 	color: var(--font-white-4);
 }
+.ctxExportItem.ctxExportDanger { color: hsl(5 70% 68%); }
+.ctxExportItem.ctxExportDanger:hover { background-color: hsla(5 60% 45% / 0.25); color: hsl(5 80% 78%); }
+.ctxExportItem.ctxExportDanger.ctxExportDisabled { color: var(--font-white-4); }
 .ctxExportSep {
 	height: 1px;
 	background-color: var(--separator-accent2);
@@ -537,6 +540,69 @@ body {
 	text-align: center;
 }
 
+/* ---- Numerology mode ---- */
+.nW { white-space: nowrap; }
+.gA { /* arrow between reduction steps */
+	font-size: 68%;
+	opacity: 0.45;
+	padding: 0em 0.15em;
+	vertical-align: 1px;
+}
+.gRoot { /* the final digital root, the number that actually matters */
+	font-weight: 700;
+}
+
+/* ---- Find Matches tab flash ---- */
+.dropbtn.findMatchesTab.findMatchesFlash {
+	animation: findMatchesBtnFlash 0.7s ease-out;
+}
+@keyframes findMatchesBtnFlash {
+	0%   { background-color: hsla(140 85% 55% / 0.55); color: #fff; }
+	60%  { background-color: hsla(140 85% 55% / 0.22); }
+	100% { background-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.dropbtn.findMatchesTab.findMatchesFlash { animation: none; background-color: hsla(140 85% 55% / 0.3); }
+}
+
+/* ---- Find Matches sweep ---- */
+.findMatchesFx {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 3;
+	background: linear-gradient(100deg,
+		hsla(140 80% 55% / 0) 0%,
+		hsla(140 85% 60% / 0.22) 45%,
+		hsla(140 95% 70% / 0.38) 50%,
+		hsla(140 85% 60% / 0.22) 55%,
+		hsla(140 80% 55% / 0) 100%);
+	background-size: 220% 100%;
+	background-repeat: no-repeat;
+	animation: findMatchesSweep 0.85s ease-out forwards;
+}
+@keyframes findMatchesSweep {
+	from { background-position: -120% 0; opacity: 1; }
+	to   { background-position: 220% 0;  opacity: 0; }
+}
+.HistoryTable tr.fxMatchPulse td {
+	animation: fxMatchPulse 0.8s ease-out;
+}
+@keyframes fxMatchPulse {
+	0%   { box-shadow: inset 0 0 0 0 hsla(140 90% 60% / 0); }
+	30%  { box-shadow: inset 0 0 14px 0 hsla(140 90% 60% / 0.28); }
+	100% { box-shadow: inset 0 0 0 0 hsla(140 90% 60% / 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.findMatchesFx, .HistoryTable tr.fxMatchPulse td { animation: none; }
+}
+
+.intBtn3.ciphToolBtn { /* Color Controls / Edit Ciphers / Encoding, in the Cyphers tab */
+	width: auto;
+	padding: 0.2em 0.7em;
+	font-size: 88%;
+	margin: 0.25em 0.1em 0em 0.1em;
+}
 .colCtrlHint {
 	font-size: 82%;
 	color: var(--font-white-3);
@@ -688,6 +754,68 @@ body {
 	opacity: 1;
 	color: var(--checkmark-accent);
 }
+/* ---- code rain intensity panel (hover on the toggle) ---- */
+.rainTuneDropdown { position: relative; }
+.rainTuneContent {
+	width: 250px !important;
+	right: 0;
+	left: auto !important;
+}
+.rainTunePanel { padding: 0.55em 0.7em 0.5em 0.7em; }
+.rainTuneRow {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	padding: 0.25em 0em;
+}
+.rainTuneLabel {
+	font-size: 80%;
+	font-weight: 600;
+	color: var(--font-white-3);
+	width: 3.6em;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+.rainTuneSlider {
+	flex: 1;
+	-webkit-appearance: none;
+	appearance: none;
+	height: 3px;
+	background: var(--border-accent);
+	outline: none;
+	cursor: pointer;
+}
+.rainTuneSlider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 12px; height: 12px;
+	border-radius: 50%;
+	background: var(--checkmark-accent);
+	cursor: pointer;
+}
+.rainTuneSlider::-moz-range-thumb {
+	width: 12px; height: 12px;
+	border: none;
+	border-radius: 50%;
+	background: var(--checkmark-accent);
+	cursor: pointer;
+}
+.rainTuneVal {
+	font-family: var(--font-family-mono), monospace;
+	font-size: 78%;
+	color: var(--font-white-2);
+	width: 3.2em;
+	text-align: right;
+}
+.rainTuneFoot {
+	border-top: 1px solid var(--separator-accent2);
+	margin-top: 0.4em;
+	padding-top: 0.5em;
+	justify-content: space-between;
+}
+.rainTuneHint { font-size: 74%; color: var(--font-white-4); }
+.intBtn3.rainTuneReset { width: auto; padding: 0.1em 0.6em; font-size: 80%; margin: 0; }
+
 .dropbtn.bgToggleBtn.bgToggleCCRU { /* fourth state */
 	opacity: 1;
 	color: hsl(320 70% 70%);

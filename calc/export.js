@@ -17,7 +17,10 @@ var ctxExportItems = [
 	{ sep: true },
 	{ label: "Export History (CSV)",   btn: "#btn-export-history-png",          need: ".HistoryTable" },
 	{ label: "Export Matches (TXT)",   btn: "#btn-export-matches-txt",          need: ".HistoryTable" },
-	{ label: "Export DB Query (CSV)",  btn: "#btn-export-db-query",             need: "#QueryTable" }
+	{ label: "Export DB Query (CSV)",  btn: "#btn-export-db-query",             need: "#QueryTable" },
+	{ sep: true },
+	{ label: "Edit Table Caption",     action: "editTableCaption",              need: ".HistoryTable" },
+	{ label: "Clear History Table",    action: "clearHistoryTable",             need: ".HistoryTable", danger: true }
 ]
 
 function closeExportContextMenu() {
@@ -29,6 +32,14 @@ function runExportContextItem(idx) {
 	var item = ctxExportItems[idx]
 	if (!item || item.sep) return
 	if (item.need && $(item.need).length === 0) return
+	if (item.action === "clearHistoryTable") {
+		phraseBoxKeypress(36) // "Home" keystroke, the app's own clear-history path
+		return
+	}
+	if (item.action === "editTableCaption") {
+		conf_HTC()
+		return
+	}
 	$(item.btn).click() // reuse the Export tab's own handler
 }
 
@@ -41,7 +52,7 @@ function showExportContextMenu(px, py) {
 		var item = ctxExportItems[i]
 		if (item.sep) { o += '<div class="ctxExportSep"></div>'; continue }
 		var avail = $(item.need).length > 0
-		o += '<div class="ctxExportItem'+(avail ? '' : ' ctxExportDisabled')+'"'
+		o += '<div class="ctxExportItem'+(avail ? '' : ' ctxExportDisabled')+(item.danger ? ' ctxExportDanger' : '')+'"'
 		o += avail ? ' onclick="runExportContextItem('+i+')"' : ' title="Not available right now"'
 		o += '>'+item.label+'</div>'
 	}

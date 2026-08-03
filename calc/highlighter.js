@@ -588,10 +588,45 @@ function buildHistMatchOrder() {
 	return { order: order, snapshot: sHistory.slice(), hidden: unmatched.length }
 }
 
+// Flashes the Find Matches tab itself, so a click registers even when the
+// table is offscreen or the search turns up nothing.
+function findMatchesFlash(btn) {
+	if (!btn) return
+	btn.classList.remove("findMatchesFlash")
+	void btn.offsetWidth // restart the animation rather than letting it no-op
+	btn.classList.add("findMatchesFlash")
+	setTimeout(function () { btn.classList.remove("findMatchesFlash") }, 700)
+}
+
+// A green sweep across the History Table when matches land, so the reorder
+// reads as something that just happened rather than the table silently
+// rearranging itself. Purely decorative and self-removing.
+function findMatchesFx() {
+	var host = document.getElementById("HistoryTableArea")
+	if (host === null) return
+
+	$("#findMatchesFx").remove()
+	var fx = document.createElement("div")
+	fx.id = "findMatchesFx"
+	fx.className = "findMatchesFx"
+	host.style.position = "relative"
+	host.appendChild(fx)
+
+	// matched rows pulse once as the sweep passes over them
+	$(".HistoryTable tr").removeClass("fxMatchPulse")
+	setTimeout(function () { $(".HistoryTable tr").addClass("fxMatchPulse") }, 90)
+
+	setTimeout(function () {
+		$("#findMatchesFx").remove()
+		$(".HistoryTable tr").removeClass("fxMatchPulse")
+	}, 1100)
+}
+
 // Applies the match ordering and tells the user how many phrases dropped out,
 // so a suddenly shorter table is never mistaken for lost data.
 function applyHistMatchOrder() {
 	histDisplayOrder = buildHistMatchOrder()
+	setTimeout(findMatchesFx, 0) // after the table has been rebuilt
 	if (histDisplayOrder !== null && histDisplayOrder.hidden > 0) {
 		var n = histDisplayOrder.hidden
 		displayCalcNotification(n + (n === 1 ? " phrase hidden" : " phrases hidden") + " with no matches", 2200)

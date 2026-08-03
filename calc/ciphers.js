@@ -1872,6 +1872,18 @@ cipherList = [
 
 ]
 
+// Edit Ciphers lets a custom cipher be saved with no category, which then
+// renders as a nameless tab in the Cyphers menu. Anything blank is filed under
+// Extra so it stays reachable. Also called after a saved workspace is applied,
+// since that rebuilds cipherList from the user's own stored definitions.
+function normaliseCipherCategories() {
+	for (var i = 0; i < cipherList.length; i++) {
+		var cat = cipherList[i].cipherCategory
+		if (typeof cat !== "string" || cat.trim() === "") cipherList[i].cipherCategory = "Extra"
+	}
+}
+normaliseCipherCategories()
+
 // The Cyphers menu lists categories in the order they first appear in
 // cipherList, so grouping the array by category is what actually controls the
 // tab order. Stable sort, so the order inside each category is untouched.

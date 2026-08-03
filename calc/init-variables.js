@@ -567,6 +567,7 @@ $(document).ready(function(){
 					createAstrologyMenu()
 					createExportMenu()
 					createAboutMenu()
+					createProfileMenu()
 					createBgToggleButton()
 					createAuthNavArea()
 

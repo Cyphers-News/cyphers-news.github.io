@@ -137,7 +137,7 @@ function coderainFrameInterval() {
 }
 
 function coderainSpeed() {
-	return coderainSpeedMin + Math.random() * coderainSpeedVar
+	return (coderainSpeedMin + Math.random() * coderainSpeedVar) * coderainSpeedMul
 }
 
 function initCodeRain() {
@@ -199,10 +199,15 @@ function initCodeRain() {
 		: "hsl("+interfaceHue+","+(22*interfaceSat)+"%,"+(16*interfaceLit)+"%)"
 	ctx.fillRect(0, 0, w, h)
 
-	cols = Math.floor(w / coderainCellW) + 1
+	// density squeezes or widens the column grid; fewer, wider columns reads as
+	// lighter rain, more, narrower columns as heavier
+	var effCellW = Math.max(6, Math.round(coderainCellW / coderainDensity))
+	cols = Math.floor(w / effCellW) + 1
+	coderainCellW = effCellW
 
 	// CCRU keeps nearly every column live at once, the standard style leaves gaps
-	var stagger = (coderainStyle === "ccru") ? 0.3 : 1.05
+	// density also shortens the idle gap, so heavier means more columns active
+	var stagger = ((coderainStyle === "ccru") ? 0.3 : 1.05) / coderainDensity
 
 	coderainDrops = []
 	var maxRow = h / coderainCellH
@@ -445,6 +450,55 @@ function updateCodeRainToggleBtn() {
 	}
 	var chk = document.getElementById("chkbox_MCR")
 	if (chk !== null) chk.checked = optMatrixCodeRain
+}
+
+// ---- intensity controls -----------------------------------------------
+//
+// Density and speed multipliers applied on top of whichever style is running,
+// so the hover panel tunes all three styles rather than needing its own set of
+// numbers per style. 1.0 is the tuned default for each.
+
+var coderainDensity = 1.0   // 0.2 sparse .. 2.0 heavy
+var coderainSpeedMul = 1.0  // 0.3 slow .. 2.5 fast
+
+function coderainSetDensity(v) {
+	coderainDensity = Math.max(0.2, Math.min(2.0, Number(v) || 1))
+	var lbl = document.getElementById("rainDensityVal")
+	if (lbl !== null) lbl.textContent = coderainDensity.toFixed(2) + "x"
+	if (optMatrixCodeRain) toggleCodeRain() // re-init, column count depends on this
+}
+
+function coderainSetSpeed(v) {
+	coderainSpeedMul = Math.max(0.3, Math.min(2.5, Number(v) || 1))
+	var lbl = document.getElementById("rainSpeedVal")
+	if (lbl !== null) lbl.textContent = coderainSpeedMul.toFixed(2) + "x"
+	// applied per frame, no re-init needed
+}
+
+function coderainResetIntensity() {
+	var d = document.getElementById("rainDensitySlider")
+	var s = document.getElementById("rainSpeedSlider")
+	if (d !== null) d.value = 1
+	if (s !== null) s.value = 1
+	coderainSetSpeed(1)
+	coderainSetDensity(1) // last, it re-inits
+}
+
+// The panel that drops down when hovering the nav toggle.
+function coderainIntensityPanel() {
+	var o = '<div class="rainTunePanel">'
+	o += '<div class="rainTuneRow"><span class="rainTuneLabel">Density</span>'
+	o += '<input type="range" id="rainDensitySlider" class="rainTuneSlider" min="0.2" max="2" step="0.05" value="'+coderainDensity+'" oninput="coderainSetDensity(this.value)">'
+	o += '<span class="rainTuneVal" id="rainDensityVal">'+coderainDensity.toFixed(2)+'x</span></div>'
+	o += '<div class="rainTuneRow"><span class="rainTuneLabel">Speed</span>'
+	o += '<input type="range" id="rainSpeedSlider" class="rainTuneSlider" min="0.3" max="2.5" step="0.05" value="'+coderainSpeedMul+'" oninput="coderainSetSpeed(this.value)">'
+	o += '<span class="rainTuneVal" id="rainSpeedVal">'+coderainSpeedMul.toFixed(2)+'x</span></div>'
+	o += '<div class="rainTuneRow rainTuneFoot">'
+	o += '<span class="rainTuneHint">Click the button to change style</span>'
+	o += '<input class="intBtn3 rainTuneReset" type="button" value="Reset" onclick="coderainResetIntensity()">'
+	o += '</div>'
+	o += '</div>'
+	return o
 }
 
 // nav button: Off -> On (new) -> Retro -> CCRU -> Off

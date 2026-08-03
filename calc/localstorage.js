@@ -13,14 +13,26 @@ function saveCalcSettingsLocalStorage(saveDef = false) {
 }
 
 function restoreCalcSettingsLocalStorage(silentMode = false) {
-	if (window.localStorage.getItem('userCalcSettings') === null) { 
+	if (window.localStorage.getItem('userCalcSettings') === null) {
 		if (window.localStorage.getItem('defCalcSettings').length > 0) {
 			sItem = "defCalcSettings" // restore default settings if no user settings found
 		} else { return }
 	} else {
 		sItem = "userCalcSettings" // restore user settings
 	}
-	var file = window.localStorage.getItem(sItem);
+	return applyCalcSettingsString(window.localStorage.getItem(sItem), silentMode)
+}
+
+// Applies a settings blob in the format produced by exportCiphersDB(true).
+// Split out of restoreCalcSettingsLocalStorage so the saved-workspace feature
+// can reuse exactly the same import path rather than duplicating it.
+//
+// Note this eval()s the cipher definitions, which is how the existing import
+// and localStorage restore have always worked. That is only safe because the
+// string can only ever come from the user themselves: localStorage, a file
+// they chose, or their own workspace row, which RLS restricts to auth.uid().
+function applyCalcSettingsString(file, silentMode = false) {
+	if (typeof file !== "string" || file.length === 0) return false
 
 	var calcOpt = file.match(/(?<=calcOptions = )[\s\S]*?\]/m) // array values
 	if (calcOpt !== null) {
@@ -29,6 +41,7 @@ function restoreCalcSettingsLocalStorage(silentMode = false) {
 	}
 
 	var ciph = file.match(/(?<=cipherList = \[)[\s\S]+/m) // match after "cipherList = [" till end of file, multiple line regex - [\s\S]+
+	if (ciph === null) return false // not a settings blob, leave the app alone
 	file = ciph[0].replace(/(\t|  +|\r|\n)/g, "").slice(10,-1) // remove tabs, consequtive spaces, line breaks - "new cipher" at start, last bracket
 	ciph = file.split(",new cipher") // split string into array
 
@@ -36,6 +49,7 @@ function restoreCalcSettingsLocalStorage(silentMode = false) {
 	for (n = 0; n < ciph.length; n++) {
 		cipherList.push(eval("new cipher("+ciph[n].slice(1,-1)+")")) // remove parethesis, evaluate string as javascript code
 	}
+	if (typeof normaliseCipherCategories === "function") normaliseCipherCategories() // custom ciphers may carry a blank category
 	document.getElementById("calcOptionsPanel").innerHTML = "" // clear menu panel
 	initCalc() // reinit
 	updateTables() // update tables
@@ -51,7 +65,7 @@ function restoreCalcSettingsLocalStorage(silentMode = false) {
 	if (!silentMode) {
 		displayCalcNotification("Settings were restored!", 1500)
 	}
-	return
+	return true
 }
 
 function clearCalcSettingsLocalStorage() {
