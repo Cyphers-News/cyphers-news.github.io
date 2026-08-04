@@ -80,7 +80,7 @@ function renderAuthNav() {
 		var inApp = (typeof toggleProfileMenu === "function")
 		o += inApp
 			? '<a class="authNavUser" href="#" title="Your profile" onclick="event.preventDefault();toggleProfileMenu()">'
-			: '<a class="authNavUser" href="profile.html" title="Your profile">'
+			: '<a class="authNavUser" href="profile.html?stay=1" title="Your profile">'
 		if (avatar) o += '<img class="authNavAvatar" src="' + authEsc(avatar) + '" alt="">'
 		else o += '<span class="authNavAvatar authNavAvatarFallback">' + authEsc(authDisplayName().charAt(0).toUpperCase()) + '</span>'
 		o += '<span class="authNavName">' + authEsc(authDisplayName()) + '</span>'

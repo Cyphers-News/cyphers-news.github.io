@@ -133,7 +133,10 @@ function renderProfileEntries() {
 				} else if (refused) {
 					o += '<span class="profileBadge profileBadgeBad" title="'+authEsc(refused)+'">blocked</span>'
 				} else {
-					o += '<button class="profileMiniBtn" onclick="profileSubmit(&quot;'+authEsc(r.phrase).replace(/"/g,'&quot;')+'&quot;)" title="Publish this phrase to the leaderboard">Submit</button>'
+					// the cipher arrives prefilled from whatever is selected, so
+					// publishing stays one click unless you want to change it
+					o += profileCipherSelect(r.id)
+					o += '<button class="profileMiniBtn" onclick="profileSubmit(&quot;'+authEsc(r.phrase).replace(/"/g,'&quot;')+'&quot;,&quot;'+r.id+'&quot;)" title="Publish this phrase to the leaderboard">Submit</button>'
 				}
 				o += '<button class="profileMiniBtn profileMiniDanger" onclick="profileDeleteEntry(&quot;'+r.id+'&quot;,&quot;'+authEsc(r.phrase).replace(/"/g,'&quot;')+'&quot;)" title="Remove from your saved history">&#215;</button>'
 				o += '</span>'
@@ -161,13 +164,18 @@ function profileSearchDebounced() {
 // clicked on, not entered. Nothing is committed until they press Enter, so
 // nothing else should move: the history table, its Find Matches ordering and
 // the current breakdown all stay exactly as they were.
-function profileUsePhrase(p) {
+function profileUsePhrase(p, keepPanel) {
 	var box = document.getElementById("phraseBox")
 	if (box === null) return
 	box.value = p
-	closeAllOpenedMenus() // so the box is reachable to press Enter in
-	box.focus()
-	box.select()
+	// Browsing someone's contributions is a list you work through, so picking
+	// one leaves the leaderboard up rather than closing the panel out from
+	// under you. Everywhere else, closing puts the input back in reach.
+	if (!keepPanel) {
+		closeAllOpenedMenus()
+		box.focus()
+		box.select()
+	}
 	displayCalcNotification("Loaded: " + p + " — press Enter to add it", 2200)
 }
 
@@ -194,12 +202,44 @@ function profileDeleteEntry(id, phrase) {
 	}).catch(function (err) { profileBody(profileErr(err)) })
 }
 
+// A cipher picker for one row, preselected to whatever is currently active so
+// the usual case is still a single click. Enabled ciphers are listed first
+// because they are the ones being worked in.
+function profileCipherSelect(rowId) {
+	if (typeof cipherList === "undefined") return ""
+	var pick = (typeof submissionCipherDefault === "function") ? submissionCipherDefault() : null
+
+	var on = [], off = []
+	for (var i = 0; i < cipherList.length; i++) {
+		(cipherList[i].enabled ? on : off).push(cipherList[i].cipherName)
+	}
+
+	var opt = function (n) {
+		return '<option value="'+authEsc(n)+'"'+(n === pick ? ' selected' : '')+'>'+authEsc(n)+'</option>'
+	}
+	var o = '<select class="profileCiphSelect" id="ciph_'+rowId+'" title="Which cypher makes this interesting?">'
+	if (on.length) {
+		o += '<optgroup label="On now">'
+		for (var a = 0; a < on.length; a++) o += opt(on[a])
+		o += '</optgroup>'
+	}
+	if (off.length) {
+		o += '<optgroup label="All cyphers">'
+		for (var b = 0; b < off.length; b++) o += opt(off[b])
+		o += '</optgroup>'
+	}
+	o += '</select>'
+	return o
+}
+
 // phrase -> why it was refused, so the row can stay red after the re-render
 var profileSubmitRejected = {}
 
-function profileSubmit(phrase) {
+function profileSubmit(phrase, rowId) {
 	delete profileSubmitRejected[phrase]
-	submissionSubmit(phrase).then(function () {
+	var sel = (rowId !== undefined) ? document.getElementById("ciph_" + rowId) : null
+	var cipherName = (sel !== null) ? sel.value : undefined
+	submissionSubmit(phrase, cipherName).then(function () {
 		displayCalcNotification("Submitted to the leaderboard", 1800)
 		renderProfileEntries()
 	}).catch(function (err) {
@@ -306,6 +346,9 @@ function renderProfileSubmissions() {
 			o += '<div class="profileRow">'
 			o += '<span class="profileRowPhrase" onclick="profileUsePhrase(&quot;'+authEsc(r.phrase).replace(/"/g,'&quot;')+'&quot;)">'+authEsc(r.phrase)+'</span>'
 			o += '<span class="profileRowActions">'
+			if (r.cipher) {
+				o += '<span class="profileBadge" title="Published under this cypher">'+authEsc(r.cipher)+(r.value !== null && r.value !== undefined ? ' ' + r.value : '')+'</span>'
+			}
 			o += '<span class="profileWhen">'+new Date(r.created_at).toLocaleDateString()+'</span>'
 			o += '<button class="profileMiniBtn profileMiniDanger" onclick="profileWithdraw(&quot;'+r.id+'&quot;)" title="Withdraw this submission">Withdraw</button>'
 			o += '</span></div>'
@@ -360,7 +403,10 @@ function profileShowContributor(userId, name) {
 		else {
 			o += '<div class="profileChips">'
 			rows.forEach(function (r) {
-				o += '<span class="profileChip" onclick="profileUsePhrase(&quot;'+authEsc(r.phrase).replace(/"/g,'&quot;')+'&quot;)" title="Send to the calculator">'+authEsc(r.phrase)+'</span>'
+				var why = r.cipher ? (r.cipher + (r.value !== null && r.value !== undefined ? ' = ' + r.value : '')) : 'Send to the calculator'
+				o += '<span class="profileChip" onclick="profileUsePhrase(&quot;'+authEsc(r.phrase).replace(/"/g,'&quot;')+'&quot;, true)" title="'+authEsc(why)+'">'+authEsc(r.phrase)
+				if (r.cipher) o += '<span class="profileChipCiph">'+authEsc(r.cipher)+'</span>'
+				o += '</span>'
 			})
 			o += '</div>'
 		}
@@ -628,117 +674,6 @@ function profileCsvDelete(id, name) {
 		.catch(function (err) { profileBody(profileErr(err)) })
 }
 
-// ---- saved birth charts -----------------------------------------------
+// Birth charts live in profile-chart.js: the tab grew its own inputs, two
+// zodiacs and a transit list, which is more than belongs in here.
 
-function renderProfileChart() {
-	var tok = profileRenderSeq
-	chartList().then(function (rows) {
-		var cur = profileReadAstroInputs()
-		var o = ''
-		o += '<div class="profileNote">Save the birth details from the Astrology tab so your chart is there next time, on any device. Only the details are stored &mdash; the chart is drawn from them.</div>'
-
-		if (cur === null) {
-			o += '<div class="profileNote profileWarn">Open the Astrology tab and set a birth date first, then come back here to save it.</div>'
-		} else {
-			o += '<div class="profileNote">Ready to save: <b>' + authEsc(cur.birth_date) + (cur.birth_time ? ' ' + authEsc(cur.birth_time) : '') + (cur.place ? ' &mdash; ' + authEsc(cur.place) : '') + '</b></div>'
-			o += '<div class="profileSearchRow">'
-			o += '<input type="text" id="chartName" class="profileSearchInput" maxlength="60" placeholder="Whose chart is this?" onkeydown="profileChartNameKey(event)">'
-			o += '<button class="profileMiniBtn" onclick="profileChartSave()">Save chart</button>'
-			o += '</div>'
-		}
-
-		if (rows.length === 0) {
-			o += '<div class="profileNote">No charts saved yet.</div>'
-			profileBody(o, tok); return
-		}
-
-		o += '<div class="profileList">'
-		rows.forEach(function (r) {
-			var when = r.birth_date + (r.birth_time ? " " + r.birth_time : "")
-			var nm = authEsc(r.name).replace(/"/g, '&quot;')
-			o += '<div class="profileRow">'
-			o += '<span class="profileRowPhrase" onclick="profileChartLoad(&quot;' + r.id + '&quot;)" title="Open in the Astrology tab">' + authEsc(r.name) + '</span>'
-			o += '<span class="profileRowActions">'
-			o += '<span class="profileWhen">' + authEsc(when) + '</span>'
-			o += '<button class="profileMiniBtn" onclick="profileChartLoad(&quot;' + r.id + '&quot;)">Open</button>'
-			o += '<button class="profileMiniBtn profileMiniDanger" onclick="profileChartDelete(&quot;' + r.id + '&quot;,&quot;' + nm + '&quot;)">&#215;</button>'
-			o += '</span></div>'
-		})
-		o += '</div>'
-		profileBody(o, tok)
-	}).catch(function (err) { profileBody(profileErr(err), tok) })
-}
-
-function profileChartNameKey(e) {
-	if (e.key === "Enter") { e.preventDefault(); profileChartSave() }
-}
-
-// Reads whatever the Astrology tab currently holds. Returns null when it has
-// not been opened, since its inputs only exist once that panel is built.
-function profileReadAstroInputs() {
-	var v = function (id) { var e = document.getElementById(id); return e === null ? null : e.value }
-	var y = v("astroY"), m = v("astroM"), d = v("astroD")
-	if (y === null || m === null || d === null) return null
-	var pad = function (n) { return (String(n).length < 2 ? "0" : "") + n }
-	return {
-		birth_date: y + "-" + pad(m) + "-" + pad(d),
-		birth_time: (v("astroHH") === null) ? "" : pad(v("astroHH")) + ":" + pad(v("astroMM")),
-		place: v("astroPlace") || "",
-		latitude: v("astroLat"),
-		longitude: v("astroLon"),
-		tz_offset: v("astroTZ")
-	}
-}
-
-function profileChartSave() {
-	var box = document.getElementById("chartName")
-	var name = (box === null) ? "" : box.value.trim()
-	if (name === "") { displayCalcNotification("Give the chart a name", 1800); return }
-	var data = profileReadAstroInputs()
-	if (data === null) { displayCalcNotification("Open the Astrology tab first", 2200); return }
-
-	chartSave(name, data).then(function (what) {
-		displayCalcNotification(what === "updated" ? "Chart updated" : "Chart saved", 1800)
-		renderProfileChart()
-	}).catch(function (err) {
-		displayCalcNotification(err.message || "Could not save the chart", 2400)
-	})
-}
-
-// Puts the saved details back into the Astrology tab and redraws it.
-function profileChartLoad(id) {
-	chartList().then(function (rows) {
-		var r = null
-		for (var i = 0; i < rows.length; i++) if (rows[i].id === id) { r = rows[i]; break }
-		if (r === null) throw new Error("That chart is gone")
-
-		closeAllOpenedMenus()
-		if (typeof toggleAstroMenu === "function" && typeof astroMenuOpened !== "undefined" && !astroMenuOpened) {
-			toggleAstroMenu() // build the panel so its inputs exist
-		}
-
-		var set = function (id2, val) {
-			var e = document.getElementById(id2)
-			if (e !== null && val !== null && val !== undefined && val !== "") e.value = val
-		}
-		var parts = String(r.birth_date).split("-")
-		set("astroY", Number(parts[0])); set("astroM", Number(parts[1])); set("astroD", Number(parts[2]))
-		if (r.birth_time) {
-			var t = String(r.birth_time).split(":")
-			set("astroHH", Number(t[0])); set("astroMM", Number(t[1] || 0))
-		}
-		set("astroPlace", r.place)
-		set("astroLat", r.latitude); set("astroLon", r.longitude); set("astroTZ", r.tz_offset)
-
-		if (typeof updateAstroChart === "function") updateAstroChart()
-		displayCalcNotification("Opened " + r.name, 2000)
-	}).catch(function (err) {
-		displayCalcNotification(err.message || "Could not open the chart", 2400)
-	})
-}
-
-function profileChartDelete(id, name) {
-	if (!window.confirm('Delete the saved chart "' + name + '"?')) return
-	chartDelete(id).then(renderProfileChart)
-		.catch(function (err) { profileBody(profileErr(err)) })
-}

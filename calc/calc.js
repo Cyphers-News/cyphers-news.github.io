@@ -366,6 +366,8 @@ function createAboutMenu() { // create menu with all cipher catergories
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input class="intBtn" type="button" value="Based Atlanteanism" onclick="gotoBasedAtlantis()">'
 	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Geomatria Calc" onclick="gotoGeomatria()">'
+	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input class="intBtn" type="button" value="Gematrinator Calculator" onclick="gotoGEMATRINATOR()">'
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input class="intBtn" type="button" value="Qliphoth Calculator" onclick="gotoQliphoth()">'
@@ -394,6 +396,8 @@ function gotoAlektryonCalculator() { window.open("https://alektryon.github.io/ge
 function gotoAlektryonRepo() { window.open("https://github.com/Alektryon/gematria", "_blank") }
 
 function gotoBasedAtlantis() { window.open("https://basedatlantis.neocities.org/", "_blank") }
+
+function gotoGeomatria() { window.open("https://resonatingloop.github.io/geomatria/", "_blank") }
 
 function gotoQliphoth() { window.open("https://qliphoth.systems/", "_blank") }
 

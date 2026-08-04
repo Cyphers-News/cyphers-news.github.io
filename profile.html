@@ -19,20 +19,25 @@
 </head>
 
 <body>
+
+	<a class="authBackBtn" href="index.html" onclick="authBackFlash(this)">&#8592; Back to the calculator</a>
+
 <div class="authPage">
 	<div class="authCard">
 
 		<div id="profileHead" class="authProfileHead"></div>
 
+		<p id="setupIntro" class="authHint hideValue" style="text-align:center;padding-bottom:0.6em">Welcome in. Pick a display name and you are set &mdash; this page only appears the first time.</p>
+
 		<div id="authMsg" class="authMsg hideValue"></div>
 
-		<div class="authField">
+		<div class="authField authNameField">
 			<label class="authLabel" for="username">Display name</label>
 			<input class="authInput" type="text" id="username" maxlength="32" autocomplete="nickname">
 			<div id="usernameErr" class="authFieldErr hideValue"></div>
 			<div class="authHint">Shown instead of your email. 2&ndash;32 characters.</div>
 		</div>
-		<button class="authBtn" type="button" id="saveBtn" onclick="doSave()">Save</button>
+		<button class="authBtn authBtnPrimary" type="button" id="saveBtn" onclick="doSave()">Save and start</button>
 
 		<div class="authDivider">account</div>
 
@@ -44,19 +49,6 @@
 				Link your Discord account
 			</button>
 			<div class="authHint" style="text-align: center; padding-top: 0.5em;">Sign in with Discord next time, using this same account.</div>
-		</div>
-
-		<div class="authDivider">saved history</div>
-
-		<div id="histArea">
-			<div class="authProfileRow">
-				<span class="authProfileKey">Saved phrases</span>
-				<span class="authProfileVal" id="histCount">&hellip;</span>
-			</div>
-			<div class="authHint" style="padding-top: 0.5em;">
-				Your History Table is saved to your account and restored on any device you sign in to.
-			</div>
-			<button class="authBtn" type="button" id="clearHistBtn" style="margin-top: 0.7em;" onclick="doClearHist()">Clear saved history</button>
 		</div>
 
 		<button class="authBtn" type="button" style="margin-top: 1.4em;" onclick="authNavSignOut(event)">Sign out</button>
@@ -89,11 +81,20 @@ requireAuth("login.html");
 $(document).ready(function () {
 	onAuthReady(function (user) {
 		if (user === null) return; // requireAuth is redirecting
-		syncProfile().then(renderProfile).catch(function (err) {
+		syncProfile().then(function () {
+			// This page is a welcome, not a gate. Once it has been through once
+			// there is nothing here a member needs on the way in, so later
+			// sign-ins go straight to the calculator. ?stay=1 is how the nav
+			// link and the profile panel open it deliberately.
+			var deliberate = new URLSearchParams(window.location.search).get("stay") === "1";
+			var seen = !!(authProfile && authProfile.setup_done);
+			if (seen && !deliberate) { window.location.replace("index.html"); return; }
+			if (!seen) document.getElementById("setupIntro").classList.remove("hideValue");
+			renderProfile();
+		}).catch(function (err) {
 			authShowMessage("authMsg", authFriendlyError(err), "error");
 			renderProfile();
 		});
-		refreshHistCount();
 	});
 });
 
@@ -148,12 +149,15 @@ function doSave() {
 	}
 
 	authSetLoading("saveBtn", true);
-	updateProfile({ username: name === "" ? null : name }).then(function () {
-		authSetLoading("saveBtn", false, "Save");
-		authShowMessage("authMsg", "Profile saved.", "success");
+	// setup_done is set here rather than on page load, so someone who closes the
+	// tab half way through still gets the welcome next time
+	updateProfile({ username: name === "" ? null : name, setup_done: true }).then(function () {
+		authSetLoading("saveBtn", false, "Save and start");
+		authShowMessage("authMsg", "Saved. Taking you to the calculator…", "success");
 		renderProfile();
+		setTimeout(function () { window.location.href = "index.html"; }, 900);
 	}).catch(function (err) {
-		authSetLoading("saveBtn", false, "Save");
+		authSetLoading("saveBtn", false, "Save and start");
 		var m = (err.message || "").toLowerCase();
 		if (m.indexOf("duplicate") > -1 || m.indexOf("unique") > -1) {
 			authFieldError("username", "That display name is already taken.");
@@ -163,28 +167,7 @@ function doSave() {
 	});
 }
 
-function refreshHistCount() {
-	histSyncCount().then(function (n) {
-		document.getElementById("histCount").textContent = n === 0 ? "none yet" : String(n);
-		document.getElementById("clearHistBtn").disabled = (n === 0);
-	}).catch(function () {
-		document.getElementById("histCount").textContent = "unavailable";
-	});
-}
 
-function doClearHist() {
-	if (!window.confirm("Delete your saved history? The phrases currently on the calculator page are not affected.")) return;
-	authClearMessage("authMsg");
-	authSetLoading("clearHistBtn", true);
-	histSyncClearSaved().then(function () {
-		authSetLoading("clearHistBtn", false, "Clear saved history");
-		authShowMessage("authMsg", "Saved history cleared.", "success");
-		refreshHistCount();
-	}).catch(function (err) {
-		authSetLoading("clearHistBtn", false, "Clear saved history");
-		authShowMessage("authMsg", authFriendlyError(err), "error");
-	});
-}
 
 // The button stays disabled until the word is typed exactly. Deleting an
 // account cannot be undone, so a single click is not enough to trigger it.

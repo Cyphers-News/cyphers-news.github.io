@@ -43,7 +43,7 @@ function submissionsList(limit) {
 	var client = getAuthClient()
 	if (client === null || authUser === null) return Promise.resolve([])
 	return client.from("phrase_submissions")
-		.select("id, phrase, created_at")
+		.select("id, phrase, cipher, value, created_at")
 		.eq("user_id", authUser.id)
 		.order("created_at", { ascending: false })
 		.limit(limit || 200)
@@ -115,12 +115,40 @@ function phraseAlreadyPublished(phrase) {
 		.catch(function () { return null })
 }
 
-function submissionSubmit(phrase) {
+// The cipher a phrase is worth publishing in, and its value there. Defaults to
+// whichever cipher is currently selected, so the common case needs no input at
+// all; the UI lets it be changed before submitting.
+function submissionCipherDefault() {
+	if (typeof cipherList === "undefined") return null
+	// the cipher whose breakdown is open is the one being looked at
+	if (typeof breakCipher !== "undefined") {
+		for (var i = 0; i < cipherList.length; i++) {
+			if (cipherList[i].cipherName === breakCipher && cipherList[i].enabled) return breakCipher
+		}
+	}
+	for (var j = 0; j < cipherList.length; j++) if (cipherList[j].enabled) return cipherList[j].cipherName
+	return null
+}
+
+function submissionCipherValue(cipherName, phrase) {
+	if (typeof cipherList === "undefined" || !cipherName) return null
+	for (var i = 0; i < cipherList.length; i++) {
+		if (cipherList[i].cipherName !== cipherName) continue
+		if (cipherList[i].wheelCipher) return null // symbols, not a number
+		var v = cipherList[i].calcGematria(phrase)
+		return (typeof v === "number" && isFinite(v)) ? v : null
+	}
+	return null
+}
+
+function submissionSubmit(phrase, cipherName) {
 	var client = getAuthClient()
 	if (client === null || authUser === null) return Promise.reject(new Error("Not signed in"))
 	phrase = String(phrase || "").trim()
 	if (phrase === "") return Promise.reject(new Error("Nothing to submit"))
 	if (phrase.length > 500) return Promise.reject(new Error("That phrase is too long to submit"))
+
+	if (cipherName === undefined) cipherName = submissionCipherDefault()
 
 	// already in the loaded corpus, so publishing it adds nothing
 	if (phraseInLoadedDatabase(phrase)) {
@@ -134,7 +162,12 @@ function submissionSubmit(phrase) {
 				: "Someone else has already published that phrase")
 		}
 		return client.from("phrase_submissions")
-			.insert({ user_id: authUser.id, phrase: phrase })
+			.insert({
+				user_id: authUser.id,
+				phrase: phrase,
+				cipher: cipherName || null,
+				value: submissionCipherValue(cipherName, phrase)
+			})
 			.then(function (res) {
 				if (res.error) {
 					// the unique index is the real guard - this catches the race
@@ -193,7 +226,7 @@ function leaderboardPhrases(userId, limit) {
 	var client = getAuthClient()
 	if (client === null || authUser === null) return Promise.resolve([])
 	return client.from("phrase_submissions")
-		.select("phrase, created_at")
+		.select("phrase, cipher, value, created_at")
 		.eq("user_id", userId)
 		.order("created_at", { ascending: false })
 		.limit(limit || 50)
