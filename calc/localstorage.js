@@ -36,8 +36,20 @@ function applyCalcSettingsString(file, silentMode = false) {
 
 	var calcOpt = file.match(/(?<=calcOptions = )[\s\S]*?\]/m) // array values
 	if (calcOpt !== null) {
-		calcOptMatch = calcOpt[0].replace(/(\t|  +|\r|\n)/g, "") // remove tabs, consequtive spaces, line breaks
-		if (isJsonString(calcOptMatch)) importCalcOptions(JSON.parse(calcOptMatch)) // load user options
+		// Parsed as-is rather than having its whitespace stripped first. JSON.parse
+		// already ignores the formatting between tokens, and the strip reached
+		// inside the values too - a caption written "two  spaces" came back as
+		// "two spaces". Harmless while options never restored; not once they do.
+		calcOptMatch = calcOpt[0]
+		if (isJsonString(calcOptMatch)) {
+			importCalcOptions(JSON.parse(calcOptMatch)) // load user options
+		} else {
+			// Skipping this quietly is how a malformed options block went unnoticed
+			// for so long: ciphers restored, every option silently did not. Blobs
+			// written before the exporter was fixed still land here, and are
+			// replaced the next time settings are saved.
+			console.warn("Settings restored without options: the calcOptions block did not parse.")
+		}
 	}
 
 	var ciph = file.match(/(?<=cipherList = \[)[\s\S]+/m) // match after "cipherList = [" till end of file, multiple line regex - [\s\S]+
@@ -49,11 +61,18 @@ function applyCalcSettingsString(file, silentMode = false) {
 	for (n = 0; n < ciph.length; n++) {
 		cipherList.push(eval("new cipher("+ciph[n].slice(1,-1)+")")) // remove parethesis, evaluate string as javascript code
 	}
-	if (typeof normaliseCipherCategories === "function") normaliseCipherCategories() // custom ciphers may carry a blank category
+	// a stored blob only knows the ciphers that existed when it was saved, so
+	// anything shipped since is added back before ordering runs
+	if (typeof mergeBuiltinCiphers === "function") mergeBuiltinCiphers()
+	// a restored workspace arrives in whatever order it was saved in, so category
+	// grouping, blank-category cleanup and alphabetical sorting are reapplied here
+	if (typeof applyCipherOrdering === "function") applyCipherOrdering()
 	document.getElementById("calcOptionsPanel").innerHTML = "" // clear menu panel
 	initCalc() // reinit
 	updateTables() // update tables
 	updateInterfaceColor(true) // update interface color (first run)
+	// a restored blob can carry a picked rain colour, which drives the backdrop
+	if (typeof coderainApplyBackdrop === "function") coderainApplyBackdrop()
 	if (userDBlive.length !== 0) { // restore controls if live database is loaded
 		$("#queryDBbtn").removeClass("hideValue") // display query button
 		$("#clearDBqueryBtn").removeClass("hideValue") // clear button

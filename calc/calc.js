@@ -87,6 +87,9 @@ var coderainSat = 0.2 // coderain saturation
 var coderainSatDefault = 0.2
 var coderainLit = 0.19  // coderain lightness
 var coderainLitDefault = 0.19
+// true once a rain colour has been chosen by hand, which is what lets the page
+// background pick up that colour - see coderainApplyBackdrop()
+var coderainColorPicked = false
 
 var optImageScale = 1.0 // image scaling factor for screenshots
 
@@ -121,6 +124,7 @@ var calcOptionsArr = [ // used to export/import settings
 	"'coderainHue'+' = '+coderainHue",
 	"'coderainSat'+' = '+coderainSat",
 	"'coderainLit'+' = '+coderainLit",
+	"'coderainColorPicked'+' = '+coderainColorPicked",
 	"'optPhraseLimit'+' = '+optPhraseLimit",
 	"'dbPageItems'+' = '+dbPageItems",
 	"'dbScrollItems'+' = '+dbScrollItems",
@@ -243,7 +247,7 @@ function createCiphersMenu() { // create menu with all cipher categories
 
     o += '<div class="dropdown">'
     o += '<button class="dropbtn">Cyphers</button>'
-    o += '<div class="dropdown-content" style="width: 380px;">'
+    o += '<div class="dropdown-content ciphersContent">'
 
     o += '<div><center>'
     o += '<input class="intBtn3" type="button" value="Empty" onclick="disableAllCiphers()">'
@@ -252,27 +256,34 @@ function createCiphersMenu() { // create menu with all cipher categories
     o += '<input class="intBtn3" type="button" value="All" onclick="enableAllCiphers()">'
     o += '</center></div>'
 
-    // panels that act on ciphers now live with the ciphers rather than in Options
-    o += '<div><center>'
-    o += '<input class="intBtn3 ciphToolBtn" type="button" value="Color Controls" onclick="toggleColorControlsMenu()">'
-    o += '<input id="edCiphBtn" class="intBtn3 ciphToolBtn" type="button" value="Edit Ciphers" onclick="toggleEditCiphersMenu()">'
-    o += '<input class="intBtn3 ciphToolBtn" type="button" value="Encoding" onclick="toggleEncodingMenu()">'
-    o += '</center></div>'
-
     o += '<hr style="background-color: var(--separator-accent2); height: 1px; border: none; margin: 0.4em;">'
 
-    o += '<div style="width: 30%; float: left;">'
+    o += '<div class="ciphCatCol">'
     for (i = 0; i < cCat.length; i++) {
         let category = cCat[i];
         // Apply 'gematriaClub' class only to the 'Gematria Club' category
         let extraClass = category === "Gematria Club" ? " gematriaClub" : "";
+        // The category column is fixed width and the buttons do not wrap, so a
+        // long name is simply cut off ("Cryptography" was). Anything past what
+        // fits gets a slightly smaller face rather than being clipped.
+        if (extraClass === "" && category.length > 10) extraClass = " ciphCatLong";
         o += '<input class="intBtn2 ciphCatButton' + extraClass + '" type="button" value="' + category + '">';
     }
     o += '</div>'
 
-    o += '<div style="width: 70%; float: left;">'
-    o += '<div id="menuCiphCatDetailsArea" style="margin: 0em 0.25em 0em 1.25em;">'
+    o += '<div class="ciphDetailCol">'
+    o += '<div id="menuCiphCatDetailsArea">'
     o += '</div></div>'
+
+    // Panels that act on ciphers live with the ciphers rather than in Options,
+    // but below the list rather than above it: on a narrow screen they are the
+    // widest thing in the menu, and having them first pushed the category
+    // column down to a width that cut the longer names in half.
+    o += '<div class="ciphToolRow"><center>'
+    o += '<input class="intBtn3 ciphToolBtn" type="button" value="Color Controls" onclick="toggleColorControlsMenu()">'
+    o += '<input id="edCiphBtn" class="intBtn3 ciphToolBtn" type="button" value="Edit Ciphers" onclick="toggleEditCiphersMenu()">'
+    o += '<input class="intBtn3 ciphToolBtn" type="button" value="Encoding" onclick="toggleEncodingMenu()">'
+    o += '</center></div>'
 
     o += '</div></div>'
 
@@ -323,33 +334,43 @@ function createAboutMenu() { // create menu with all cipher catergories
 	// o += '</center>'
 	// o += '<div style="margin: 1em;"></div>'
 	
-	o += '<input class="intBtn" type="button" value="Quickstart Guide" onclick="displayQuickstartGuide()">'
+	// Credit line, not a link: Gematro took their site down, so this is plain
+	// text at the top rather than a button that leads nowhere.
+	o += '<div class="aboutCredit"><b>Coded by Gematro in 2021</b></div>'
+
+	o += '<input class="intBtn" type="button" value="&#9989; Quickstart Guide" onclick="displayQuickstartGuide()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Coded By Gematro in 2021" onclick="gotoCodedByGematro()">'
+	// U+1F4E7, not U+2709: the latter is a text-presentation glyph and falls
+	// back to a tofu box wherever the font has no colour emoji for it
+	o += '<input class="intBtn" type="button" value="&#128231; Contact Us" onclick="displayContactPanel()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Cyphers Repository in 2022" onclick="gotoCyphersRepo()">'
+	o += '<input class="intBtn" type="button" value="Alektryon Github 2021" onclick="gotoAlektryonRepo()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Hyperdope Repository in 2023" onclick="gotoGitHubRepo()">'
+	o += '<input class="intBtn" type="button" value="Cyphers Github 2022" onclick="gotoCyphersRepo()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Gematria Research" onclick="gotoAlektryonBlog()">'
+	o += '<input class="intBtn" type="button" value="Hyperdope Github 2023" onclick="gotoGitHubRepo()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Ciphers News" onclick="gotoCiphersNews()">'
+	o += '<input class="intBtn" type="button" value="&#128218; Gematria Research" onclick="gotoAlektryonBlog()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Cyphers Youtube" onclick="gotoCyphersYoutube()">'
+	o += '<input class="intBtn" type="button" value="&#128154; Ciphers News" onclick="gotoCiphersNews()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Cyphers Discord" onclick="gotoDiscordServer()">'
+	o += '<input class="intBtn" type="button" value="&#127916; Cyphers Youtube" onclick="gotoCyphersYoutube()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Cyphers Twitter / X" onclick="gotoX()">'
+	o += '<input class="intBtn" type="button" value="&#128172; Cyphers Discord" onclick="gotoDiscordServer()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Cyphers Database" onclick="gotoDatabase()">'
+	o += '<input class="intBtn" type="button" value="&#128241; Cyphers Twitter / X" onclick="gotoX()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="&#128229; Cyphers Database" onclick="gotoDatabase()">'
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input class="intBtn" type="button" value="Alektryon Calculator" onclick="gotoAlektryonCalculator()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Alektryon Repository in 2021" onclick="gotoAlektryonRepo()">'
+	o += '<input class="intBtn" type="button" value="Based Atlanteanism" onclick="gotoBasedAtlantis()">'
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input class="intBtn" type="button" value="Gematrinator Calculator" onclick="gotoGEMATRINATOR()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Cyphers Webmaster Net Void" onclick="gotoNetVoid()">'
+	o += '<input class="intBtn" type="button" value="Qliphoth Calculator" onclick="gotoQliphoth()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Cyphers Net Void" onclick="gotoNetVoid()">'
 	o += '<div style="margin: 0.5em;"></div>'
 	
 
@@ -362,8 +383,6 @@ function createAboutMenu() { // create menu with all cipher catergories
 	document.getElementById("calcOptionsPanel").innerHTML = o
 }
 
-function gotoCodedByGematro() { window.open("https://github.com/gematro", "_blank") }
-
 function gotoCyphersRepo() { window.open("https://github.com/CyphersNews/gematro-hyperdope", "_blank") }
 
 function gotoGitHubRepo() { window.open("https://github.com/malonehunter/hyperdope-gematria", "_blank") }
@@ -373,6 +392,10 @@ function gotoAlektryonBlog () {window.open("https://gematriaresearch.blogspot.co
 function gotoAlektryonCalculator() { window.open("https://alektryon.github.io/gematria/", "_blank") }
 
 function gotoAlektryonRepo() { window.open("https://github.com/Alektryon/gematria", "_blank") }
+
+function gotoBasedAtlantis() { window.open("https://basedatlantis.neocities.org/", "_blank") }
+
+function gotoQliphoth() { window.open("https://qliphoth.systems/", "_blank") }
 
 function gotoCiphersNews () {window.open("https://ciphers.news", "_blank") }
 
@@ -444,7 +467,6 @@ function createOptionsMenu() { // Options and Features merged into one menu
 	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Cipher Chart<input type="checkbox" id="chkbox_CC" onclick="conf_CC()" '+CCstate+'><span class="custChkBox"></span></label></div>'
 	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Letter/Word Count<input type="checkbox" id="chkbox_LWC" onclick="conf_LWC()" '+LWCstate+'><span class="custChkBox"></span></label></div>'
 	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Gradient Charts<input type="checkbox" id="chkbox_GC" onclick="conf_GC()" '+GCstate+'><span class="custChkBox"></span></label></div>'
-	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Numerology Mode<input type="checkbox" id="chkbox_NMD" onclick="conf_NMD()" '+NMDstate+'><span class="custChkBox"></span></label></div>'
 
 	o += sep
 
@@ -642,12 +664,62 @@ function conf_NMD() { // Numerology Mode
 
 // Set from the right-click menu. Appears in the History Table's corner cell,
 // so it is carried into the printed and CSV exports.
+// Edits the caption in place rather than through window.prompt().
+//
+// A prompt is easy to suppress - one "stop this page creating dialogs" and the
+// menu item silently does nothing - and it is miserable on a phone. Worse, an
+// empty caption rendered as an empty cell, so with nothing typed there was
+// nothing on screen at all and the feature looked like it had vanished. The
+// cell now shows a faint prompt when empty and is click-to-edit.
 function conf_HTC() {
-	var p = window.prompt("Name this History Table (shown in exports):", optHistTableCaption)
-	if (p === null) return // cancelled
-	optHistTableCaption = String(p).slice(0, 120)
-	updateHistoryTable()
+	var cell = document.querySelector(".mP")
+	if (cell === null) { // no history table on screen to caption
+		displayCalcNotification("Add a phrase first, then name the table", 2200)
+		return
+	}
+	captionStartEdit(cell)
 }
+
+function captionStartEdit(cell) {
+	if (cell.querySelector("input") !== null) return // already editing
+
+	var input = document.createElement("input")
+	input.type = "text"
+	input.className = "mPEdit"
+	input.maxLength = 120
+	input.value = optHistTableCaption
+	input.placeholder = "Name this table"
+
+	cell.innerHTML = ""
+	cell.appendChild(input)
+
+	// grow the field with the text, so a long name is typed on one line
+	// instead of being wrapped inside the narrow corner cell
+	var fit = function () {
+		input.style.width = "0px"
+		input.style.width = Math.max(input.scrollWidth, 80) + "px"
+	}
+	fit()
+	input.addEventListener("input", fit)
+
+	input.focus()
+	input.select()
+
+	var finish = function (save) {
+		if (save) optHistTableCaption = input.value.slice(0, 120)
+		updateHistoryTable() // redraws the cell, dropping the input with it
+	}
+	input.addEventListener("blur", function () { finish(true) })
+	input.addEventListener("keydown", function (e) {
+		if (e.key === "Enter") { e.preventDefault(); finish(true) }
+		else if (e.key === "Escape") { e.preventDefault(); finish(false) }
+		e.stopPropagation() // the page has global key handlers on the phrase box
+	})
+}
+
+$(document).ready(function () {
+	$("body").on("click", ".mP", function () { captionStartEdit(this) })
+})
 
 function conf_CFC() { // Rain Follows Cipher
 	optCoderainFollowCipher = !optCoderainFollowCipher
@@ -803,13 +875,14 @@ function conf_iScale() { // image scale
 function createFindMatchesMenu() {
 	var o = document.getElementById("calcOptionsPanel").innerHTML
 
-	var CCMstate = ""; var SCMstate = ""; var SOMstate = "";
+	var CCMstate = ""; var SCMstate = ""; var SOMstate = ""; var NMDstate = "";
+	if (optNumerologyMode) NMDstate = "checked"
 	if (optFiltCrossCipherMatch) CCMstate = "checked"
 	if (optFiltSameCipherMatch) SCMstate = "checked"
 	if (optShowOnlyMatching) SOMstate = "checked"
 
 	o += '<div class="dropdown">'
-	o += '<button class="dropbtn findMatchesTab" onclick="findMatchesFlash(this);updateHistoryTableAutoHlt()">Find Matches</button>'
+	o += '<button class="dropbtn findMatchesTab" onclick="findMatchesFlash(this);updateHistoryTableAutoHlt()"><span class="labFull">Find Matches</span><span class="labShort">Match</span></button>'
 	o += '<div class="dropdown-content" style="width: 210px; left: -55px;">'
 
 	// no Find Matches button here, the tab itself runs the search
@@ -817,14 +890,14 @@ function createFindMatchesMenu() {
 
 	o += '<hr style="background-color: var(--separator-accent2); height: 1px; border: none; margin: 0.75em;">'
 
-	o += '<input class="intBtn" type="button" value="Enter As Words" onclick="phraseBoxKeypress(35)">' // "End" keystroke
-	o += create_PL() // Word limit
-
-	o += '<hr style="background-color: var(--separator-accent2); height: 1px; border: none; margin: 0.75em;">'
 
 	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Cross Cipher Match<input type="checkbox" id="chkbox_CCM" onclick="conf_CCM()" '+CCMstate+'><span class="custChkBox"></span></label></div>'
 	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Same Cipher Match<input type="checkbox" id="chkbox_SCM" onclick="conf_SCM()" '+SCMstate+'><span class="custChkBox"></span></label></div>'
 	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Show Only Matching<input type="checkbox" id="chkbox_SOM" onclick="conf_SOM()" '+SOMstate+'><span class="custChkBox"></span></label></div>'
+	o += '<div class="optionElement"><label class="chkLabel ciphCheckboxLabel2">Numerology Mode<input type="checkbox" id="chkbox_NMD" onclick="conf_NMD()" '+NMDstate+'><span class="custChkBox"></span></label></div>'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Enter As Words" onclick="phraseBoxKeypress(35)">' // "End" keystroke
+	o += create_PL() // Word limit
 	o += '<div style="margin: 0.5em;"></div>'
 
 	o += '</div></div>'
@@ -851,7 +924,7 @@ function createBgToggleButton() {
 function createDateCalcMenu() {
 	var o = document.getElementById("calcOptionsPanel").innerHTML
 	o += '<div class="dropdown">'
-	o += '<button class="dropbtn dateCalcTab" onclick="toggleDateCalcMenu()">Date Calculator</button>'
+	o += '<button class="dropbtn dateCalcTab" onclick="toggleDateCalcMenu()"><span class="labFull">Date Calculator</span><span class="labShort">Date Calc</span></button>'
 	o += '</div>'
 	document.getElementById("calcOptionsPanel").innerHTML = o
 }
@@ -861,12 +934,13 @@ function createDateCalcMenu() {
 // simply left empty, so the calculator still works on its own.
 // Profile tab, sits after About. Account features live here; signed-out
 // visitors get a sign-in prompt rather than a broken panel.
+// No nav button of its own any more: when signed in, your display name at the
+// end of the row is what opens this panel, so the name and the account
+// settings behind it are the same control rather than two beside each other.
+// Signed-out visitors already have Login and Register there saying the same
+// thing, so nothing is lost. See renderAuthNav() in auth-ui.js.
 function createProfileMenu() {
-	var o = document.getElementById("calcOptionsPanel").innerHTML
-	o += '<div class="dropdown">'
-	o += '<button class="dropbtn dateCalcTab" onclick="toggleProfileMenu()">Profile</button>'
-	o += '</div>'
-	document.getElementById("calcOptionsPanel").innerHTML = o
+	return
 }
 
 function createAuthNavArea() {
@@ -881,7 +955,7 @@ function createAuthNavArea() {
 function createAstrologyMenu() {
 	var o = document.getElementById("calcOptionsPanel").innerHTML
 	o += '<div class="dropdown">'
-	o += '<button class="dropbtn dateCalcTab" onclick="toggleAstroMenu()">Astrology</button>'
+	o += '<button class="dropbtn dateCalcTab" onclick="toggleAstroMenu()"><span class="labFull">Astrology</span><span class="labShort">Astro</span></button>'
 	o += '</div>'
 	document.getElementById("calcOptionsPanel").innerHTML = o
 }
@@ -1318,8 +1392,28 @@ function initCiphers(updDefCiph = true) { // list categories, define default (ba
 	initColorArrays()
 }
 
+// The base-4 the calculator ships with: Ordinal, Reduction, Reverse Ordinal,
+// Reverse Reduction.
+//
+// Not defaultCipherArray, which initCiphers() rebuilds from whatever happens to
+// be enabled - so restoring a workspace or loading a preset quietly redefined
+// "Default" as that preset's own selection, and there was then no way back to
+// the base-4 at all. The built-in snapshot still knows which ciphers shipped
+// enabled, so that is what Default means.
+function defaultCipherNames() {
+	if (typeof builtinCipherArgs !== "undefined") {
+		var names = []
+		for (var i = 0; i < builtinCipherArgs.length; i++) {
+			if (builtinCipherArgs[i][8] === true) names.push(builtinCipherArgs[i][0])
+		}
+		if (names.length) return names
+	}
+	if (defaultCipherArraySaved.length) return defaultCipherArraySaved
+	return defaultCipherArray
+}
+
 function enableDefaultCiphers() {
-	var ciphArr = defaultCipherArray
+	var ciphArr = defaultCipherNames()
 	for (n = 0; n < cipherList.length; n++) {
 		cur_chkbox = document.getElementById("cipher_chkbox"+n)
 		if (ciphArr.indexOf(cipherList[n].cipherName) == -1) { // disable non-default ciphers
@@ -1525,16 +1619,20 @@ function updateEnabledCipherTable() { // draws a table with phrase gematria for 
 			}
 			if (ciph_in_row < result_columns) { // until number of ciphers in row equals number of colums
 				cur_col = (optColoredCiphers) ? 'color: hsl('+cipherList[i].H+' '+cipherList[i].S+'% '+cipherList[i].L+'% / 1);' : ''
+				// a wheel cipher's result is a symbol string, not a number: it needs
+				// room to wrap instead of overrunning the neighbouring name cell, and
+				// the number-properties tooltip has nothing to say about it
+				var valSpan = cipherList[i].wheelCipher
+					? '<span class="wheelVal">'+cipherList[i].calcGematria(phr)+'</span>'
+					: '<span class="numProp">'+cipherList[i].calcGematria(phr)+'<span>'
 				if (odd_col) { // odd column, "cipher name - value"
 					o += '<td class="phraseGemCiphName" style="'+cur_col+'">'+cipherList[i].cipherName+'</td>'
-					// o += '<td class="phraseGemValueOdd" style="'+cur_col+'">'+cipherList[i].calcGematria(phr)+'</td>'
-					o += '<td class="phraseGemValueOdd" style="'+cur_col+'"><span class="numProp">'+cipherList[i].calcGematria(phr)+'<span></td>'
+					o += '<td class="phraseGemValueOdd" style="'+cur_col+'">'+valSpan+'</td>'
 					ciph_in_row++
 					odd_col = false
 					//console.log(cipherList[i].cipherName+": odd")
 				} else if (!odd_col) { // even column, "value - cipher name"
-					// o += '<td class="phraseGemValueEven" style="'+cur_col+'">'+cipherList[i].calcGematria(phr)+'</td>'
-					o += '<td class="phraseGemValueEven" style="'+cur_col+'"><span class="numProp">'+cipherList[i].calcGematria(phr)+'<span></td>'
+					o += '<td class="phraseGemValueEven" style="'+cur_col+'">'+valSpan+'</td>'
 					o += '<td class="phraseGemCiphName" style="'+cur_col+'">'+cipherList[i].cipherName+'</td>'
 					ciph_in_row++
 					odd_col = true
@@ -1712,13 +1810,22 @@ function updateHistoryTable(hltBoolArr) {
 	// row count comes from the order rather than from sHistory
 	var rowCount = (dispOrder !== null) ? dispOrder.length : sHistory.length
 
+	// ...and the ciphers that carried none of those matches are dropped too, so
+	// the result is not padded out with columns of misses. null the rest of the
+	// time, when every enabled cipher is shown.
+	var hiddenCiph = (typeof histHiddenCipherSet === "function") ? histHiddenCipherSet() : null
+	var ciphShown = function (name) { return hiddenCiph === null || hiddenCiph[name] !== true }
+
 	for (var xi = 0; xi < rowCount; xi++) {
 		x = (dispOrder !== null) ? dispOrder[xi] : xi
 
 		if (xi % 25 == 0 && enabledCiphCount !== 0) { // show header after each 25 phrases
-			ms += '<tr class="cH"><td class="mP">'+escHtml(optHistTableCaption)+'</td>'
+			// Left empty when unnamed. The corner cell is part of the table's
+			// shape, not a place for instructions - the right-click menu is where
+			// the feature is announced.
+			ms += '<tr class="cH"><td class="mP" title="Click to name this table">'+escHtml(optHistTableCaption)+'</td>'
 			for (z = 0; z < cipherList.length; z++) {
-				if (cipherList[z].enabled) {
+				if (cipherList[z].enabled && ciphShown(cipherList[z].cipherName)) {
 					curCiphCol = (optColoredCiphers) ? 'color: hsl('+cipherList[z].H+' '+cipherList[z].S+'% '+cipherList[z].L+'% / 1);' : ''
 					if (compactHistoryTable) {
 						ms += '<td class="hCV" style="height: '+calcCipherNameHeightPx(cipherList[z].cipherName)+'px;"><span class="hCV2" style="'+curCiphCol+'">'+cipherList[z].cipherName+'</span></td>' // color of cipher displayed in the table
@@ -1765,7 +1872,13 @@ function updateHistoryTable(hltBoolArr) {
 					}
 				}
 				ciphCount++ // next position in hltBoolArr
-				if (optNumerologyMode) {
+
+				// counted above whether shown or not: hltBoolArr is indexed by
+				// position among the enabled ciphers, so skipping the increment
+				// for a hidden column would shift every later cell's highlight
+				if (!ciphShown(curCiph.cipherName)) continue
+
+				if (optNumerologyMode && !curCiph.wheelCipher) { // a symbol string has no digital root
 					// 79 -> 16 -> 7, stopping at a single digit or a master number
 					var chain = reductionChain(gemVal)
 					var spanVal = ''
@@ -1775,7 +1888,12 @@ function updateHistoryTable(hltBoolArr) {
 					}
 					ms += '<td class="tC nW">'+spanVal+'</td>'
 				} else {
-					ms += '<td class="tC"><span style="color: '+col+'" class="gV"> '+gemVal+' </span></td>'
+					// "gV" opts the cell into the number-properties tooltip, which
+					// searches the prime/fibonacci/triangular/star tables. Handing it a
+					// symbol string makes every comparison NaN, so no scan ever breaks
+					// early and the tab locks up - wheel values get a plain class.
+					var valCls = curCiph.wheelCipher ? 'gVW' : 'gV'
+					ms += '<td class="tC"><span style="color: '+col+'" class="'+valCls+'"> '+gemVal+' </span></td>'
 				}
 			}
 		}

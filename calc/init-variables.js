@@ -26,7 +26,7 @@ $(document).ready(function(){
 
 var code_rain; // var to clear interval
 var height_html, canvas, ctx
-var w, h, ypos
+var w, h, ypos, yglf // yglf - retro rain trail glyphs, one array per column
 
 // ==================================================================
 // highlighter.js
@@ -749,3 +749,26 @@ $(document).ready(function() {
 	$("body").on("contextmenu", ".numProp", showTooltipClickAlt);
 
 });
+
+// ==================================================================
+// breakdown.js - keep the cipher chart fitted when the viewport changes
+
+// Mobile drops the menus below the nav using position:fixed, which needs the
+// nav's real height rather than a guess, since it wraps to a second row and
+// could wrap further on a very narrow screen.
+function measureNavHeight() {
+	var nav = document.getElementById("calcOptionsPanel")
+	if (nav === null) return
+	var h = Math.ceil(nav.getBoundingClientRect().height)
+	if (h > 0) document.documentElement.style.setProperty("--navH", (h + 4) + "px")
+}
+
+$(window).on("resize", function () {
+	measureNavHeight()
+	if (typeof fitCipherChart === "function") fitCipherChart()
+})
+
+$(document).ready(function () {
+	measureNavHeight()
+	setTimeout(measureNavHeight, 300) // again once webfonts have settled
+})

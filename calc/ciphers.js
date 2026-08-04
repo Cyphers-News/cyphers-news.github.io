@@ -39,16 +39,6 @@ cipherList = [
 		false
 	),
 
-	new cipher(
-		"Single Reduction",
-		"English",
-		219, 61, 72,
-		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
-		[1,2,3,4,5,6,7,8,9,1,2,3,4,5,6,7,8,9,10,2,3,4,5,6,7,8],
-		true,
-		false,
-		false
-	),
 
 
 	
@@ -74,16 +64,6 @@ cipherList = [
 		false
 	),
 	
-	new cipher(
-		"Capitals Added",
-		"English",
-		94, 88, 63,
-		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90],
-		[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52],
-		true,
-		false,
-		true
-	),
 
 	new cipher(
 		"Capitals Mixed",
@@ -98,27 +78,7 @@ cipherList = [
 
 	
 
-	new cipher(
-		"KV Exception",
-		"English",
-		200, 77, 63,
-		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
-		[1,2,3,4,5,6,7,8,9,1,11,3,4,5,6,7,8,9,1,2,3,22,5,6,7,8],
-		true,
-		false,
-		false
-	),
 
-	new cipher(
-		"SKV Exception",
-		"English",
-		204, 79, 64,
-		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
-		[1,2,3,4,5,6,7,8,9,1,11,3,4,5,6,7,8,9,10,2,3,22,5,6,7,8],
-		true,
-		false,
-		false
-	),
 
 
 	new cipher(
@@ -263,6 +223,56 @@ cipherList = [
 	// values, same case sensitivity) and the repeated names broke lookups,
 	// since every cipherName == comparison in the app resolves to the first
 	// match. The English copies are kept.
+
+	// Single Reduction, KV Exception and Capitals Added open the Gematria
+	// section. They sit here rather than under English because that is where
+	// they are looked for. Moved, not copied - they were once defined in both
+	// categories, and the repeated names broke every cipherName lookup, which
+	// resolves to the first match.
+
+	new cipher(
+		"Single Reduction",
+		"Gematria",
+		219, 61, 72,
+		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
+		[1,2,3,4,5,6,7,8,9,1,2,3,4,5,6,7,8,9,10,2,3,4,5,6,7,8],
+		true,
+		false,
+		false
+	),
+
+	new cipher(
+		"KV Exception",
+		"Gematria",
+		200, 77, 63,
+		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
+		[1,2,3,4,5,6,7,8,9,1,11,3,4,5,6,7,8,9,1,2,3,22,5,6,7,8],
+		true,
+		false,
+		false
+	),
+
+	new cipher(
+		"SKV Exception",
+		"Gematria",
+		204, 79, 64,
+		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
+		[1,2,3,4,5,6,7,8,9,1,11,3,4,5,6,7,8,9,10,2,3,22,5,6,7,8],
+		true,
+		false,
+		false
+	),
+
+	new cipher(
+		"Capitals Added",
+		"Gematria",
+		94, 88, 63,
+		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90],
+		[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52],
+		true,
+		false,
+		true
+	),
 
 	new cipher(
 		"English Sumerian",
@@ -1870,31 +1880,132 @@ cipherList = [
 
 
 
+
+	// ====================== Cryptography ======================
+	// Substitution ciphers from alektryon.github.io/gematria. Their values
+	// are symbols rather than numbers, which the cipher class detects and
+	// handles as wheel ciphers. The leading number in each character array is
+	// the sequence length, so multi-letter units like "ch" can be mapped.
+
+	new cipher(
+		"Illuminati Novice Wheel",
+		"Cryptography",
+		60, 50, 60,
+		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
+		["12.","11.","10.","9.","8.","7.","6.","5.","4.","4.","3.","2.","1.","13.","14.","15.","16.","17.","18.","19.","20.","20.","21.","22.","23.","24."],
+		true,
+		false,
+		false
+	),
+
+	new cipher(
+		"Franz Bardon",
+		"Cryptography",
+		30, 70, 65,
+		[2,97,0,98,0,99,104,100,0,101,0,102,0,103,0,105,0,107,0,108,0,108,104,109,0,110,0,111,0,112,0,114,0,115,0,116,0,116,122,117,0,118,0,119,0,121,0,122,0,122,104],
+		["E","R","H","M","A","V","W","O","Z","S","SCH","L","G","U","F","T","N","B","K","I","D","P","'","C","CH"],
+		true,
+		false,
+		false
+	),
+
+	new cipher(
+		"Rydumy",
+		"Cryptography",
+		30, 40, 70,
+		[2,97,0,98,0,99,0,100,0,101,0,102,0,103,0,103,106,103,122,104,0,105,0,106,0,107,0,108,0,109,0,110,0,111,0,112,0,112,115,113,0,114,0,115,0,116,0,116,115,117,0,118,0,119,0,120,0,121,0,122,0],
+		["Y","P","Z","T","O","W","C","QU","X","K","U","V","G","R","N","M","E","B","PH","Q","L","H","D","TH","I","F","J","CH","A","S"],
+		true,
+		false,
+		false
+	),
+
+	new cipher(
+		"Alfabeto Carbonaro",
+		"Cryptography",
+		180, 50, 70,
+		[1,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
+		["O","P","G","T","I","V","C","H","E","J","K","R","N","M","A","B","Q","L","Z","D","U","F","W","X","Y","S"],
+		true,
+		false,
+		false
+	),
+
+	new cipher(
+		"Cryptographic AQ",
+		"Cryptography",
+		60, 33, 62,
+		[1,48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
+		["0.","1.","2.","3.","4.","5.","6.","7.","8.","9.","10.","11.","12.","13.","14.","15.","16.","17.","18.","19.","20.","21.","22.","23.","24.","25.","26.","27.","28.","29.","30.","31.","32.","33.","34.","35."],
+		true,
+		false,
+		false
+	),
+
+	new cipher(
+		"Heximal AQ",
+		"Cryptography",
+		150, 40, 60,
+		[1,48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
+		["00.","01.","02.","03.","04.","05.","10.","11.","12.","13.","14.","15.","20.","21.","22.","23.","24.","25.","30.","31.","32.","33.","34.","35.","40.","41.","42.","43.","44.","45.","50.","51.","52.","53.","54.","55."],
+		true,
+		false,
+		false
+	),
+
+	new cipher(
+		"English Trigon",
+		"Cryptography",
+		30, 70, 70,
+		[1,48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
+		["10.","20.","21.","30.","31.","32.","40.","41.","42.","43.","50.","51.","52.","53.","54.","60.","61.","62.","63.","64.","65.","70.","71.","72.","73.","74.","75.","76.","80.","81.","82.","83.","84.","85.","86.","87."],
+		true,
+		false,
+		false
+	),
+
+	new cipher(
+		"AQ Astrology",
+		"Cryptography",
+		90, 60, 70,
+		[1,48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
+		["☉︎","☿","♀","☽︎","♂","♃","♄","♅","♆","♇","☊","☋","♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓","Ⅰ.","Ⅱ.","Ⅲ.","Ⅳ.","Ⅴ.","Ⅵ.","Ⅶ.","Ⅷ.","Ⅸ.","Ⅹ.","Ⅺ.","Ⅻ."],
+		true,
+		false,
+		false
+	),
+
+
 ]
 
+// ---- cipher list ordering ------------------------------------------------
+//
+// All three passes are re-runnable and are applied together by
+// applyCipherOrdering(). That matters because restoring a saved workspace
+// rebuilds cipherList from the user's own stored definitions, which arrive in
+// whatever order they were saved in, so the ordering has to be reapplied
+// afterwards rather than only at load.
+
 // Edit Ciphers lets a custom cipher be saved with no category, which then
-// renders as a nameless tab in the Cyphers menu. Anything blank is filed under
-// Extra so it stays reachable. Also called after a saved workspace is applied,
-// since that rebuilds cipherList from the user's own stored definitions.
+// renders as a nameless tab in the Cyphers menu. Anything blank goes to Extra.
 function normaliseCipherCategories() {
 	for (var i = 0; i < cipherList.length; i++) {
 		var cat = cipherList[i].cipherCategory
 		if (typeof cat !== "string" || cat.trim() === "") cipherList[i].cipherCategory = "Extra"
 	}
 }
-normaliseCipherCategories()
 
 // The Cyphers menu lists categories in the order they first appear in
 // cipherList, so grouping the array by category is what actually controls the
 // tab order. Stable sort, so the order inside each category is untouched.
-// Anything not listed here keeps its relative position at the end.
+// Anything not listed keeps its relative position at the end.
 var cipherCategoryOrder = [
 	"English", "Reverse", "Gematria", "CCRU", "Conspiracy",
-	"Extra", "Maths", "Archaic", "Thelemic",
+	"Cryptography", "Extra", "Maths", "Archaic", "Thelemic",
 	"Languages", "Latin", "Hebrew", "Greek"
 ]
 
-;(function orderCipherCategories() {
+function orderCipherCategories() {
 	var rank = {}
 	for (var i = 0; i < cipherCategoryOrder.length; i++) rank[cipherCategoryOrder[i]] = i
 	var decorated = cipherList.map(function (c, idx) {
@@ -1903,19 +2014,136 @@ var cipherCategoryOrder = [
 	})
 	decorated.sort(function (a, b) { return (a.r - b.r) || (a.idx - b.idx) })
 	for (var j = 0; j < decorated.length; j++) cipherList[j] = decorated[j].c
-})()
+}
 
-// The Languages category collects ciphers from many different scripts, so there
-// is no meaningful structural order for them. Sort alphabetically by name.
-// Runs after the category grouping, so those slots are contiguous, and before
-// initCiphers() builds the colour/index arrays so they stay in step.
-;(function sortLanguageCiphers() {
-	var slots = [], items = []
-	for (var i = 0; i < cipherList.length; i++) {
-		if (cipherList[i].cipherCategory === "Languages") { slots.push(i); items.push(cipherList[i]) }
-	}
-	items.sort(function (a, b) {
-		return a.cipherName.localeCompare(b.cipherName, undefined, { sensitivity: "base" })
+// These categories are grab-bags with no meaningful structural order, so they
+// read better alphabetically. Runs after the grouping, so each one's slots are
+// contiguous.
+var alphabeticalCipherCategories = ["Languages", "Extra", "Maths", "Archaic", "Cryptography"]
+
+function sortCipherCategoriesAlphabetically() {
+	alphabeticalCipherCategories.forEach(function (cat) {
+		var slots = [], items = []
+		for (var i = 0; i < cipherList.length; i++) {
+			if (cipherList[i].cipherCategory === cat) { slots.push(i); items.push(cipherList[i]) }
+		}
+		items.sort(function (a, b) {
+			return a.cipherName.localeCompare(b.cipherName, undefined, { sensitivity: "base" })
+		})
+		for (var j = 0; j < slots.length; j++) cipherList[slots[j]] = items[j]
 	})
-	for (var j = 0; j < slots.length; j++) cipherList[slots[j]] = items[j]
-})()
+}
+
+// Ciphers that should lead their category, in this order, whatever order they
+// happen to sit in cipherList.
+//
+// Grouping by category is a stable sort, so a restored workspace keeps the
+// relative order it was saved with - which means arranging these in the file
+// alone would only ever be right for a first-time visitor.
+var cipherPinnedOrder = [
+	{ category: "Gematria", names: ["Single Reduction", "KV Exception", "SKV Exception", "Capitals Added"] }
+]
+
+function pinCipherOrder() {
+	for (var p = 0; p < cipherPinnedOrder.length; p++) {
+		var cat = cipherPinnedOrder[p].category
+		var want = cipherPinnedOrder[p].names
+
+		// the slots this category occupies, and what is currently in them
+		var slots = [], items = []
+		for (var i = 0; i < cipherList.length; i++) {
+			if (cipherList[i].cipherCategory === cat) { slots.push(i); items.push(cipherList[i]) }
+		}
+		if (!slots.length) continue
+
+		var lead = [], rest = []
+		for (var w = 0; w < want.length; w++) {
+			for (var j = 0; j < items.length; j++) {
+				if (items[j] !== null && items[j].cipherName === want[w]) { lead.push(items[j]); items[j] = null; break }
+			}
+		}
+		for (var k = 0; k < items.length; k++) if (items[k] !== null) rest.push(items[k])
+
+		var ordered = lead.concat(rest)
+		for (var s = 0; s < slots.length; s++) cipherList[slots[s]] = ordered[s]
+	}
+}
+
+// Runs at load, and again after a saved workspace is applied.
+function applyCipherOrdering() {
+	normaliseCipherCategories()
+	orderCipherCategories()
+	sortCipherCategoriesAlphabetically()
+	pinCipherOrder() // last: it overrides the alphabetical pass where they overlap
+}
+
+applyCipherOrdering()
+
+// ---- built-in cipher snapshot -------------------------------------------
+//
+// Every restore path — localStorage defaults, saved user settings, a synced
+// workspace — rebuilds cipherList from a stored blob, replacing this file's
+// list wholesale. That means a cipher shipped in a later build never reaches
+// anyone who has used the site before: their stored blob predates it and wins.
+//
+// So take a snapshot now, while cipherList is still purely what this file
+// defines, and let mergeBuiltinCiphers() top a restored list back up. Args are
+// captured rather than object references because Edit Ciphers mutates cipher
+// objects in place, which would otherwise corrupt the snapshot.
+var builtinCipherArgs = cipherList.map(function (c) {
+	return [
+		c.cipherName, c.cipherCategory, c.H, c.S, c.L,
+		c.cArr.slice(), c.vArr.slice(),
+		c.diacriticsAsRegular, c.enabled, c.caseSensitive
+	]
+})
+
+// Appends built-in ciphers the restored list has no entry for, matched by
+// name. Anything the user has renamed, retuned or re-valued is left untouched,
+// since only the absence of the name triggers a re-add.
+//
+// The trade-off: a built-in the user deliberately deleted comes back on the
+// next load. That is the cost of ever being able to ship a new cipher, and
+// deleting it again is one click, so it lands on the recoverable side.
+function mergeBuiltinCiphers() {
+	if (typeof builtinCipherArgs === "undefined") return 0
+
+	var byName = {}
+	for (var b = 0; b < builtinCipherArgs.length; b++) byName[builtinCipherArgs[b][0]] = builtinCipherArgs[b]
+
+	var have = {}
+	for (var i = 0; i < cipherList.length; i++) {
+		var cur = cipherList[i]
+		have[cur.cipherName] = true
+
+		// Adopt the shipped category for a built-in the user has not altered.
+		// Adding a cipher was not the only thing a stored blob could hold back:
+		// moving one between categories never reached anyone either, because
+		// their blob still carried the old category and won. Only untouched
+		// ciphers are corrected - matching characters and values means this is
+		// still the cipher as shipped, so its filing is ours to decide; anything
+		// edited keeps whatever the user chose.
+		var def = byName[cur.cipherName]
+		if (def !== undefined && cur.cipherCategory !== def[1] && sameCipherTable(cur, def)) {
+			cur.cipherCategory = def[1]
+		}
+	}
+
+	var added = 0
+	for (var j = 0; j < builtinCipherArgs.length; j++) {
+		var a = builtinCipherArgs[j]
+		if (have[a[0]]) continue
+		cipherList.push(new cipher(a[0], a[1], a[2], a[3], a[4], a[5].slice(), a[6].slice(), a[7], a[8], a[9]))
+		added++
+	}
+	return added
+}
+
+// Is this cipher still character-for-character the one that shipped?
+function sameCipherTable(c, def) {
+	var cArr = def[5], vArr = def[6]
+	if (c.cArr.length !== cArr.length || c.vArr.length !== vArr.length) return false
+	for (var i = 0; i < cArr.length; i++) if (c.cArr[i] !== cArr[i]) return false
+	for (var j = 0; j < vArr.length; j++) if (c.vArr[j] !== vArr[j]) return false
+	return true
+}

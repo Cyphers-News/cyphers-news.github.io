@@ -73,8 +73,14 @@ function renderAuthNav() {
 		o += '<a class="authNavLink" href="login.html">Login</a>'
 		o += '<a class="authNavLink authNavPrimary" href="register.html">Register</a>'
 	} else {
+		// On the calculator the name opens the profile panel in place. On the
+		// auth pages there is no panel to open, so it stays a link to the full
+		// profile page.
 		var avatar = authAvatarUrl()
-		o += '<a class="authNavUser" href="profile.html" title="Your profile">'
+		var inApp = (typeof toggleProfileMenu === "function")
+		o += inApp
+			? '<a class="authNavUser" href="#" title="Your profile" onclick="event.preventDefault();toggleProfileMenu()">'
+			: '<a class="authNavUser" href="profile.html" title="Your profile">'
 		if (avatar) o += '<img class="authNavAvatar" src="' + authEsc(avatar) + '" alt="">'
 		else o += '<span class="authNavAvatar authNavAvatarFallback">' + authEsc(authDisplayName().charAt(0).toUpperCase()) + '</span>'
 		o += '<span class="authNavName">' + authEsc(authDisplayName()) + '</span>'
@@ -97,3 +103,12 @@ function authNavSignOut(e) {
 $(document).ready(function () {
 	onAuthReady(renderAuthNav)
 })
+
+// Flashes the back link green on click, matching the Find Matches tab, so the
+// press registers before the navigation happens.
+function authBackFlash(el) {
+	if (!el) return
+	el.classList.remove("authBackFlash")
+	void el.offsetWidth // restart the animation rather than letting it no-op
+	el.classList.add("authBackFlash")
+}

@@ -131,7 +131,9 @@ a:active{
 	left: 0;
 	width: 100%;
 	height: 100%;
-	background: var(--body-bg-accent);
+	/* --rain-backdrop is set only once a rain colour has been picked, so the
+	   chosen scheme still shows when the rain is off or running thin */
+	background: var(--rain-backdrop, var(--body-bg-accent));
 }
 
 body {
@@ -162,7 +164,7 @@ body {
 body {
 	font-family: var(--font-family), "Arial", sans-serif;
 	color: var(--font-white-2);
-	background-color: var(--body-bg-accent);
+	background-color: var(--rain-backdrop, var(--body-bg-accent));
 }
 
 .gematroLogo {
@@ -540,6 +542,21 @@ body {
 	text-align: center;
 }
 
+/* ---- mobile nav: short labels, two rows ---- */
+.labShort { display: none; }
+@media (max-width: 911px) {
+	.labFull { display: none; }
+	.labShort { display: inline; }
+	.dropbtn {
+		padding: 0.35em 0.6em;
+		font-size: 94%;
+	}
+	.dropbtn.dateCalcTab { font-size: 94%; }
+	.dropbtn.bgToggleBtn { font-size: 78%; padding: 0.35em 0.5em; }
+	#calcOptionsPanel { padding-top: 0.4em; }
+
+}
+
 /* ---- Numerology mode ---- */
 .nW { white-space: nowrap; }
 .gA { /* arrow between reduction steps */
@@ -702,6 +719,19 @@ body {
 .phraseGemContainer tr:nth-child(even) {
 	background-color: var(--table-row-even);
 }
+/* Wheel ciphers substitute symbols, so their result is a string as long as the
+   phrase rather than a two or three digit number. At the numeric size it runs
+   straight over the cipher name beside it, so it is set smaller and allowed to
+   wrap inside its own cell. */
+.phraseGemValueOdd .wheelVal, .phraseGemValueEven .wheelVal {
+	display: inline-block;
+	max-width: 100%;
+	font-size: 60%;
+	line-height: 1.15;
+	overflow-wrap: anywhere;
+	white-space: normal;
+	vertical-align: middle;
+}
 .phraseGemValueOdd, .phraseGemValueEven {
 	font-size: 180%;
 	text-align: center;
@@ -757,10 +787,13 @@ body {
 /* ---- code rain intensity panel (hover on the toggle) ---- */
 .rainTuneDropdown { position: relative; }
 .rainTuneContent {
-	width: 250px !important;
+	width: 286px !important;
 	right: 0;
 	left: auto !important;
 }
+/* Held open by JS while the pointer is on its way to a control, or while the
+   OS colour dialog has focus - see rainTuneOpen() in coderain.js */
+.rainTuneDropdown.rainTuneStuck .rainTuneContent { display: block; }
 .rainTunePanel { padding: 0.55em 0.7em 0.5em 0.7em; }
 .rainTuneRow {
 	display: flex;
@@ -768,16 +801,26 @@ body {
 	gap: 0.5em;
 	padding: 0.25em 0em;
 }
+/* Wide enough for the longest label ("DENSITY"/"COLOUR") at this size, and
+   fixed so it cannot be squeezed by the slider next to it - at 3.6em both of
+   those overran their box and collided with the track. */
 .rainTuneLabel {
 	font-size: 80%;
 	font-weight: 600;
 	color: var(--font-white-3);
-	width: 3.6em;
+	width: 5.4em;
+	flex: 0 0 auto;
+	white-space: nowrap;
 	text-transform: uppercase;
-	letter-spacing: 0.04em;
+	letter-spacing: 0.03em;
 }
 .rainTuneSlider {
 	flex: 1;
+	/* a range input has an intrinsic minimum width, and flex items refuse to
+	   shrink past their content by default - together that pushed the row wider
+	   than the panel on a narrow screen and the colour swatch was clipped off
+	   the right edge */
+	min-width: 0;
 	-webkit-appearance: none;
 	appearance: none;
 	height: 3px;
@@ -804,16 +847,48 @@ body {
 	font-family: var(--font-family-mono), monospace;
 	font-size: 78%;
 	color: var(--font-white-2);
-	width: 3.2em;
+	width: 3.4em;
+	flex: 0 0 auto;
+	white-space: nowrap;
 	text-align: right;
 }
 .rainTuneFoot {
 	border-top: 1px solid var(--separator-accent2);
-	margin-top: 0.4em;
-	padding-top: 0.5em;
+	margin-top: 0.35em;
+	padding-top: 0.45em;
 	justify-content: space-between;
 }
-.rainTuneHint { font-size: 74%; color: var(--font-white-4); }
+/* hue slider painted with the full spectrum so it reads as a colour picker */
+.rainHueSlider {
+	background: linear-gradient(to right,
+		hsl(0 80% 55%), hsl(60 80% 55%), hsl(120 80% 55%),
+		hsl(180 80% 55%), hsl(240 80% 55%), hsl(300 80% 55%), hsl(359 80% 55%)) !important;
+	height: 6px !important;
+}
+/* Native colour input, matched to the per-cipher swatches in Color Controls */
+.rainColorPicker {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 26px;
+	height: 15px;
+	padding: 0;
+	border: 1px solid var(--border-accent);
+	background: none;
+	vertical-align: middle;
+	cursor: pointer;
+}
+.rainColorPicker::-webkit-color-swatch-wrapper { padding: 0; }
+.rainColorPicker::-webkit-color-swatch { border: none; }
+.rainColorPicker::-moz-color-swatch { border: none; }
+.rainFollowLabel {
+	font-size: 76%;
+	color: var(--font-white-3);
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3em;
+	cursor: pointer;
+}
+.rainFollowLabel input { margin: 0; }
 .intBtn3.rainTuneReset { width: auto; padding: 0.1em 0.6em; font-size: 80%; margin: 0; }
 
 .dropbtn.bgToggleBtn.bgToggleCCRU { /* fourth state */
@@ -1187,6 +1262,31 @@ body {
 	font-weight: 500;
 	font-size: 125%;
 }
+/* The caption is a label for the table, not a heading over it - at 125% it
+   read larger than the cipher names it sits beside. Only .mP is changed so
+   the query table's corner cell keeps its original size. */
+.mP {
+	font-size: 88%;
+	line-height: 1.25;
+	overflow-wrap: anywhere;
+	cursor: text;
+}
+/* While editing, the cell grows with what is typed rather than forcing the
+   text to wrap inside the old corner width - the field is sized in JS from its
+   own content. */
+.mPEdit {
+	box-sizing: content-box;
+	font-family: var(--font-family), "Arial", sans-serif;
+	font-size: 100%;
+	color: var(--font-white-1);
+	background-color: var(--input-bg-accent);
+	border: 1px solid var(--border-accent);
+	padding: 0.15em 0.35em;
+	outline: none;
+	text-align: center;
+	min-width: 6em;
+	max-width: 22em;
+}
 .mPQ { /* query table - top left cell */
 	/*width: 300px;*/
 	height: 150px;
@@ -1196,7 +1296,15 @@ body {
 	font-weight: 500;
 	cursor: pointer;
 }
-.gV {
+/* Wheel cipher values: same look, but deliberately not .gV/.gVQ so the
+   number-properties tooltip never fires on a symbol string. No pointer either,
+   since there is nothing to open. */
+.gVW, .gVQW {
+	font-size: 100%;
+	font-weight: 500;
+	overflow-wrap: anywhere;
+}
+.gV, .gVW {
 	padding: 0em 0.2em;
 }
 .pCHT { /* phrase comment - history table */
@@ -1271,6 +1379,50 @@ body {
     text-align: center; /* Center-align the text */
     line-height: 1.2; /* Line height for readability */
     min-height: auto; /* Allow dynamic height */
+}
+
+/* Cyphers menu: category list beside the cypher checkboxes, tools underneath.
+   The columns were inline percentage floats, which on a narrow screen left the
+   category column too small for its own labels. A min-width keeps the names
+   readable and the detail column takes whatever is left. */
+.ciphersContent { width: 380px; }
+.ciphCatCol {
+	float: left;
+	width: 30%;
+	min-width: 108px;
+}
+.ciphDetailCol {
+	float: left;
+	width: 70%;
+}
+.ciphDetailCol #menuCiphCatDetailsArea { margin: 0em 0.25em 0em 1.25em; }
+.ciphToolRow {
+	clear: both;
+	padding-top: 0.5em;
+	margin-top: 0.4em;
+	border-top: 1px solid var(--separator-accent2);
+}
+
+@media (max-width: 911px) { /* mobile */
+	/* Use the width that is actually available rather than shrink-to-fit, so
+	   the category column gets its min-width instead of being squeezed.
+	   Qualified with .dropdown-content to outrank the generic mobile rule
+	   below, which sets width:auto !important at the same specificity and
+	   would otherwise win by coming later in the file. */
+	.dropdown-content.ciphersContent {
+		width: calc(100vw - 1em) !important;
+		max-width: calc(100vw - 1em) !important;
+	}
+	.ciphCatCol { width: 38%; }
+	.ciphDetailCol { width: 62%; }
+	.ciphDetailCol #menuCiphCatDetailsArea { margin-left: 0.6em; }
+}
+
+/* Long category names, sized down just enough to fit the fixed-width column */
+.intBtn2.ciphCatLong {
+    font-size: 90%;
+    padding-left: 0.35em;
+    padding-right: 0.35em;
 }
 
 /* Special class for "Gematria Club" that needs wrapping */
@@ -1468,13 +1620,44 @@ body {
 	.dropdown-content, .dropdown-content-opt {
 		left: 50% !important;
 		transform: translateX(-50%);
+		/* the centring above was already right; what was missing is a width cap.
+		   Menus keep their desktop pixel widths, so the longest labels ran off
+		   the screen edge. Cap to the viewport and scroll instead. */
+		width: auto !important;
+		min-width: 0 !important;
+		max-width: calc(100vw - 1em) !important;
+		max-height: calc(100vh - var(--navH, 58px) - 1.5em);
+		overflow-y: auto;
+		overflow-x: hidden;
+		box-sizing: border-box;
 	}
-	.dropdown-about {
-		transform: none !important;
+	/* About used to opt out of the shared centring with transform: none, which
+	   left it starting at the middle of the screen and running off the right
+	   edge. It centres like every other menu now. */
+	/* The rain panel pins itself to the toggle's right edge on desktop. On
+	   mobile that fights the centring above - right:0 stayed set while left
+	   became 50%, so the box was measured from the wrong side and the colour
+	   swatch fell off the screen. Centre it like every other menu. */
+	.rainTuneContent {
+		right: auto !important;
+		width: auto !important;
+		max-width: calc(100vw - 1em) !important;
+		box-sizing: border-box;
 	}
+	.rainTunePanel { min-width: 0; }
 }
 .dropdown-content-opt {
 	padding: 0.5em;
+}
+
+/* Credit line at the top of the About menu - text, not a link */
+.aboutCredit {
+	font-size: 82%;
+	color: var(--font-white-3);
+	text-align: center;
+	padding: 0.15em 0.4em 0.55em 0.4em;
+	margin-bottom: 0.35em;
+	border-bottom: 1px solid var(--separator-accent2);
 }
 
 .dropdown:hover .dropdown-content, .dropdown:hover .dropdown-content-opt {display: block;}
@@ -2077,7 +2260,91 @@ body {
 		width: 80% !important;
 		height: 80% !important;
 	}
+	/* the contact form is short, so it should not be stretched to 80% of the
+	   screen with the rest left empty */
+	.quickGuide.contactPanel {
+		height: auto !important;
+		max-height: 80% !important;
+	}
 }
+/* Quickstart Guide topic picker */
+.qgIntro {
+	font-size: 88%;
+	color: var(--font-white-3);
+	margin: 0.1em 0 0.7em 0;
+}
+.qgTopicBar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.3em;
+	padding-bottom: 0.7em;
+	border-bottom: 1px solid var(--separator-accent2);
+}
+.intBtn3.qgTopicBtn {
+	width: auto;
+	margin: 0;
+	padding: 0.25em 0.7em;
+	font-size: 88%;
+	flex: 0 0 auto;
+}
+.intBtn3.qgTopicBtn.qgTopicOn {
+	background-color: var(--btn-active-accent);
+	color: var(--font-white-1);
+	font-weight: 600;
+}
+/* The chosen topic scrolls on its own, so the credits underneath stay put
+   instead of being pushed off the bottom by a long section. */
+.qgBody {
+	max-height: 46vh;
+	overflow-y: auto;
+	padding: 0.2em 0.1em 0.4em 0.1em;
+}
+
+/* Contact panel - reuses the guide's overlay, but it is a short form so it
+   sizes to its content instead of filling the screen */
+.quickGuide.contactPanel {
+	height: auto;
+	max-height: 80%;
+	top: 12%;
+}
+/* balance stops the last line of a short paragraph being a single stranded
+   word, which is what these are: two or three lines each */
+.contactPanel .qgIntro,
+.contactPanel .contactFoot,
+.contactPanel .contactLabel {
+	text-wrap: pretty;
+	text-wrap: balance;
+	max-width: 46ch;
+}
+.contactField { padding-bottom: 0.8em; }
+.contactLabel {
+	display: block;
+	font-size: 88%;
+	font-weight: 600;
+	color: var(--font-white-2);
+	padding-bottom: 0.3em;
+}
+.contactSelect, .contactTextarea {
+	width: 100%;
+	box-sizing: border-box;
+	font-family: var(--font-family), "Arial", sans-serif;
+	font-size: 95%;
+	color: var(--font-white-1);
+	background-color: var(--input-bg-accent);
+	border: 1px solid var(--border-accent);
+	padding: 0.4em 0.5em;
+	outline: none;
+}
+.contactTextarea { resize: vertical; min-height: 5em; }
+.contactActions {
+	display: flex;
+	gap: 0.5em;
+	flex-wrap: wrap;
+	padding-top: 0.2em;
+}
+.contactActions .intBtn3 { width: auto; margin: 0; padding: 0.3em 0.8em; }
+.contactFoot { padding-top: 0.9em; }
+
 .qgBold, .qgBold2 {
 	font-size: 100%;
 	font-weight: 500;

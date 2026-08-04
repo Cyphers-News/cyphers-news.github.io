@@ -44,10 +44,15 @@
 	box-sizing: border-box;
 }
 .authPerksTitle {
-	font-size: 112%;
+	font-size: 115%;
 	font-weight: 600;
 	color: var(--font-white-1);
 	margin-bottom: 0.9em;
+}
+.authFree {
+	color: hsl(140 60% 60%);
+	font-weight: 700;
+	letter-spacing: 0.03em;
 }
 .authPerksList {
 	list-style: none;
@@ -56,26 +61,73 @@
 }
 .authPerksList li {
 	font-size: 88%;
-	color: var(--font-white-3);
-	line-height: 1.45em;
-	padding: 0em 0em 0.85em 1.3em;
+	color: var(--font-white-2);
+	line-height: 1.5em;
+	padding: 0em 0em 0.9em 1.9em;
 	position: relative;
+	/* keeps a short paragraph from dropping one orphan word onto its own line */
+	text-wrap: pretty;
+	text-wrap: balance;
+	hyphens: auto;
 }
 .authPerksList li b { color: var(--font-white-1); font-weight: 600; }
 .authPerkIcon {
 	position: absolute;
 	left: 0;
 	top: 0.05em;
-	color: var(--checkmark-accent);
-	font-size: 75%;
+	font-size: 105%;
+	line-height: 1.3em;
 }
 .authPerksFoot {
-	font-size: 80%;
-	color: var(--font-white-4);
+	/* was --font-white-4, too faint to read against the rain */
+	font-size: 83%;
+	color: var(--font-white-2);
 	border-top: 1px solid var(--separator-accent2);
-	padding-top: 0.8em;
+	padding-top: 0.85em;
 	margin-top: 0.2em;
-	line-height: 1.4em;
+	line-height: 1.5em;
+	text-wrap: pretty;
+	text-wrap: balance;
+}
+.authPerksFoot b { color: hsl(140 60% 65%); font-weight: 700; }
+
+/* Wordmark, not an icon: it is a wide landscape lockup, so it is sized on
+   width and given no border-radius or circular crop. */
+.authLogo {
+	display: block;
+	max-width: 280px;
+	width: 78%;
+	height: auto;
+	margin: 0 auto 1.1em auto;
+}
+
+/* Back to the calculator, pinned top-left, flashes green on click */
+.authBackBtn {
+	position: absolute;
+	top: 0.9em;
+	left: 0.9em;
+	z-index: 5;
+	font-size: 85%;
+	font-weight: 500;
+	color: var(--font-white-2);
+	background-color: var(--btn-bg-accent);
+	border: 1px solid var(--border-accent);
+	border-bottom: 1px solid var(--border-accent) !important;
+	padding: 0.4em 0.85em;
+	text-decoration: none;
+}
+.authBackBtn:hover { background-color: var(--btn-hover-accent); color: var(--font-white-1); }
+.authBackBtn.authBackFlash { animation: authBackFlash 0.7s ease-out; }
+@keyframes authBackFlash {
+	0%   { background-color: hsla(140 85% 55% / 0.75); color: #fff; border-color: hsl(140 70% 55%); }
+	60%  { background-color: hsla(140 85% 55% / 0.3); }
+	100% { background-color: var(--btn-bg-accent); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.authBackBtn.authBackFlash { animation: none; background-color: hsla(140 85% 55% / 0.4); }
+}
+@media (max-width: 560px) {
+	.authBackBtn { position: static; display: inline-block; margin: 0.8em 0em 0em 0.8em; }
 }
 
 .authTitle {
@@ -388,6 +440,74 @@
 	color: var(--font-white-3);
 }
 .profileBadge.profileBadgeOk { color: hsl(140 55% 65%); border-color: hsl(140 35% 40%); }
+
+/* The avatar is the control: clicking the circle reveals the options */
+.profileAvatarPick {
+	position: relative;
+	display: inline-block;
+	cursor: pointer;
+	border-radius: 50%;
+	overflow: hidden;
+	flex: 0 0 auto;
+	padding: 0;
+	border: none;
+	background: none;
+	line-height: 0;
+}
+.profileAvatarOpts { padding-top: 0.2em; }
+.profileAvatarOverlay {
+	position: absolute;
+	left: 0; right: 0; bottom: 0;
+	text-align: center;
+	font-size: 72%;
+	padding: 0.2em 0;
+	color: #fff;
+	background: hsla(0 0% 0% / 0.55);
+	opacity: 0;
+	transition: opacity 0.12s;
+}
+.profileAvatarPick:hover .profileAvatarOverlay,
+.profileAvatarPick:focus-within .profileAvatarOverlay { opacity: 1; }
+.profileNameRow { padding-top: 0.9em; }
+
+/* Closing the account. Set apart from the rest of the tab so it cannot be
+   mistaken for one of the ordinary settings above it. */
+.profileDanger {
+	margin-top: 1.2em;
+	padding: 0.7em 0.8em;
+	border: 1px solid hsl(5 45% 40%);
+	background: hsla(5 60% 40% / 0.10);
+}
+.profileDangerTitle {
+	font-weight: 600;
+	color: hsl(5 75% 74%);
+	padding-bottom: 0.3em;
+}
+.profileDangerRow {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	padding-top: 0.5em;
+	flex-wrap: wrap;
+}
+.profileDangerRow .profileSearchInput { flex: 1 1 12em; min-width: 0; }
+.profileBadge.profileBadgeBad { color: hsl(5 75% 70%); border-color: hsl(5 50% 45%); }
+
+/* A submission refused by the publishing rules. The row turns red and keeps
+   the reason underneath, so it survives the re-render instead of disappearing
+   with the notification. */
+.profileRow.profileRowRefused {
+	flex-wrap: wrap;
+	background: hsla(5 60% 40% / 0.16) !important;
+	border-left: 2px solid hsl(5 65% 55%);
+}
+.profileRow.profileRowRefused .profileRowPhrase { color: hsl(5 75% 78%); }
+.profileRowWhy {
+	flex: 1 0 100%;
+	font-size: 84%;
+	color: hsl(5 70% 74%);
+	padding-top: 0.25em;
+}
 
 .profileLbRow { cursor: pointer; }
 .profileLbRow:hover { background: var(--btn-hover-accent); }
