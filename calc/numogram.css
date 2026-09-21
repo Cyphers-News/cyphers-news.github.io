@@ -1,0 +1,840 @@
+/* ===================== Numogram (Decimal Labyrinth) =====================
+ *
+ * The green field and the black diagram on it.
+ *
+ * Everything here is scoped under .numField and sets its own colours from
+ * scratch. The site's theme variables deliberately do not reach in: the whole
+ * point of the artefact is that it is a flat saturated green field, not a dark
+ * website background, so it must not inherit one when the user changes skin.
+ *
+ * Two tokens carry the entire palette. --num-field is the ground, --num-ink is
+ * the diagram. [data-invert="1"] swaps them, which is the whole of the black
+ * variant - no second stylesheet, no duplicated rules.
+ */
+
+/* The site's shared panel wrapper is padded 0.5em 0em 0.75em 1em - one em on
+ * the left, nothing on the right - and sized with width:fit-content. On every
+ * other panel that is invisible, because their background is the panel's own.
+ * Here the green field IS the artwork, so the missing right-hand padding read
+ * as the field being cut off, and the 1em on the left as it being off-centre.
+ * This panel supplies its own even box instead.
+ */
+.numogramBG {
+	padding: 0.6em;
+	width: fit-content;
+	max-width: 100%;
+	margin: 0.5em auto;
+	box-sizing: border-box;
+}
+
+.numField {
+	--num-field: #1fa14a;          /* flat, saturated, no gradient */
+	--num-ink: #000000;
+	background: var(--num-field);
+	color: var(--num-ink);
+	padding: 1.5em;                /* even on all four sides */
+	margin: 0 auto;
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
+	/* A column: the head and the foot take what they need, the diagram takes
+	 * the rest. numogramFit() sets the height from the space actually
+	 * available, so the whole artefact fits the window without scrolling
+	 * whatever the window is - which a vh unit cannot do from inside a
+	 * scrolling container. */
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	font-family: "Montserrat", Arial, sans-serif;
+	/* no radius, no shadow, no border: it is a field, not a card */
+}
+
+.numField[data-invert="1"] {
+	--num-field: #000000;
+	--num-ink: #ffffff;
+}
+
+/* ---- typography: two words, set small, out of the diagram's way -------- */
+
+.numTitle {
+	display: flex;
+	align-items: baseline;
+	gap: 0.9em;
+	margin: 0 0 0.9em;
+}
+.numTitleMain {
+	font-size: 1.05em;
+	font-weight: 700;
+	letter-spacing: 0.34em;
+	color: var(--num-ink);
+}
+.numTitleSub {
+	font-size: 0.72em;
+	font-weight: 600;
+	letter-spacing: 0.3em;
+	opacity: 0.62;
+	color: var(--num-ink);
+}
+
+/* ---- the diagram ------------------------------------------------------
+ *
+ * The SVG keeps its 2:3 ratio at every width. It is given room rather than
+ * stretched: the composition matters more than filling the panel.
+ */
+
+/* Diagram and annotation side by side. The figure is roughly 0.6 as wide as it
+ * is tall, so standing the text in the space beside it is what makes the field
+ * an even box instead of a wide one with a narrow drawing adrift in it. */
+.numBody {
+	display: flex;
+	align-items: stretch;
+	gap: 1.8em;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+.numSide {
+	/* 32-40% of the feature, and no more: the diagram comes first. */
+	flex: 0 0 34%;
+	min-width: 15em;
+	max-width: 26em;
+	/* Stretch to the body's height and scroll its own overflow. A word trace
+	 * carries a long reading - the character values, two reductions and two
+	 * provenance lines - and that must not push the artwork out of the field
+	 * or spill over the note beneath it. The diagram stays put; only the
+	 * reading moves. */
+	align-self: stretch;
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding-top: 0.2em;
+	padding-right: 0.4em;
+	text-align: left;
+}
+.numSide::-webkit-scrollbar { width: 4px; }
+.numSide::-webkit-scrollbar-thumb { background: currentColor; opacity: 0.3; }
+
+.numStage {
+	display: flex;
+	justify-content: center;
+	align-items: stretch;
+	gap: 1.4em;
+	flex: 1 1 66%;
+	min-width: 0;
+	min-height: 0;
+}
+
+/* Two panels inside the stage: the canonical figure, and - only when a
+ * cosmological model is chosen - the geocentric one beside it. Keeping them
+ * apart is the whole correction: the Ptolemaic structure used to be drawn
+ * through the Numogram, and that is what made both unreadable. */
+.numPanel {
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	min-width: 0;
+	min-height: 0;
+}
+.numPanelMain { flex: 1 1 auto; }
+.numPanelGeo { flex: 0 0 34%; max-width: 22em; }
+.numPanelGeo:empty { display: none; }
+
+.numGeoSvg {
+	display: block;
+	width: 100%;
+	height: 100%;
+	max-height: 100%;
+	overflow: visible;
+	color: var(--num-ink);
+}
+.numSvg {
+	display: block;
+	/* Fill the stage and let preserveAspectRatio="xMidYMid meet" do the
+	 * fitting: the drawing scales by the tighter of the two axes and stays
+	 * centred, so it is never stretched on one axis and never clipped. */
+	width: 100%;
+	height: 100%;
+	min-height: 0;
+	overflow: visible;
+	color: var(--num-ink);
+}
+
+/* Thin technical line work throughout. Stroke widths are in user units, so
+ * they scale with the figure and keep their relative weights. */
+
+.numZoneRing,
+.numGateRing {
+	fill: none;
+	stroke: var(--num-ink);
+	stroke-width: 3.2;
+	vector-effect: non-scaling-stroke;
+}
+/* Opaque, because the gate rides its own channel and the line must pass
+ * behind the numeral rather than through it - which is exactly how the
+ * reference draws these. */
+.numGateRing { stroke-width: 2.4; fill: var(--num-field); }
+
+.numZoneText,
+.numGateText {
+	fill: var(--num-ink);
+	text-anchor: middle;
+	dominant-baseline: central;
+	font-family: "Montserrat", Arial, sans-serif;
+	font-weight: 500;
+	pointer-events: none;
+}
+.numGateText { font-size: 22px; font-weight: 600; }
+
+/* The current's own value, set in the same small circle as a gate so the two
+ * kinds of annotation read as one family - which is how the reference does it. */
+.numCurValRing {
+	fill: var(--num-field);
+	stroke: var(--num-ink);
+	stroke-width: 2.4;
+	vector-effect: non-scaling-stroke;
+}
+.numCurValText {
+	fill: var(--num-ink);
+	text-anchor: middle;
+	dominant-baseline: central;
+	font-family: "Montserrat", Arial, sans-serif;
+	font-size: 19px;
+	font-weight: 600;
+	pointer-events: none;
+}
+.numCurrent.numOn .numCurValRing { fill: var(--num-ink); }
+.numCurrent.numOn .numCurValText { fill: var(--num-field); }
+
+/* The tractor arrow stays fine even when its current is a broad form: the
+ * weight belongs to the link between the pair, not to where it runs. */
+.numCurTractor { stroke-width: 2.4; }
+.numCurrent.numOn .numCurTractor { stroke-width: 4; }
+
+.numChLine,
+.numCurLine {
+	fill: none;
+	stroke: var(--num-ink);
+	stroke-width: 2.6;
+	stroke-linecap: round;
+	vector-effect: non-scaling-stroke;
+}
+.numCurLine { stroke-width: 3.2; }
+
+.numChHead,
+.numCurHead,
+.numCurBody {
+	fill: var(--num-ink);
+	stroke: none;
+}
+
+/* The Torque circuit: the broad directional form. A filled tapered ribbon,
+ * not a thick stroke - the reference's heavy currents swell along their
+ * length rather than running at one width. */
+.numCurrent.numHeavy .numCurBody { fill: var(--num-ink); }
+
+/* ---- zones: selectable, but never buttons ------------------------------ */
+
+.numZone { cursor: pointer; }
+.numZone:focus { outline: none; }
+
+/* Hover and focus: the outline thickens. That is all. */
+.numZone:hover .numZoneRing,
+.numZone:focus-visible .numZoneRing { stroke-width: 5.4; }
+
+/* Focus needs to be visible without a glow, so the ring doubles rather than
+ * lights up - a dashed companion just outside it, in the same ink. */
+.numZone:focus-visible .numZoneRing {
+	stroke-dasharray: 5 5;
+}
+
+/* Selected: the zone inverts. Ink fills the circle, the numeral drops out to
+ * the field colour. The original diagram's own vocabulary, nothing added. */
+.numZone.numOn .numZoneRing { fill: var(--num-ink); stroke-width: 3.2; }
+.numZone.numOn .numZoneText { fill: var(--num-field); }
+
+/* The syzygetic twin: heavier outline, not filled. */
+.numZone.numTwin .numZoneRing { stroke-width: 6.2; }
+
+/* Where a current or channel lands: a doubled rim. */
+.numZone.numTrace .numZoneRing { stroke-width: 4.6; }
+
+.numGate.numOn .numGateRing { fill: var(--num-ink); }
+.numGate.numOn .numGateText { fill: var(--num-field); }
+
+/* A lit current or channel thickens; it does not glow. */
+.numChannel.numOn .numChLine { stroke-width: 5.2; }
+.numCurrent.numOn .numCurLine { stroke-width: 6; }
+
+/* ---- dimming: selection, time system, layers ---------------------------
+ *
+ * Everything unselected recedes by losing opacity rather than changing hue,
+ * so the black/green relationship holds at every state.
+ */
+
+.numSvg[data-mode="torque"] .numCurrent:not([data-sys="torque"]),
+.numSvg[data-mode="torque"] .numChannel:not([data-sys="torque"]),
+.numSvg[data-mode="torque"] .numGate:not([data-sys="torque"]),
+.numSvg[data-mode="torque"] .numZone:not([data-sys="torque"]),
+.numSvg[data-mode="warp"] .numCurrent:not([data-sys="warp"]),
+.numSvg[data-mode="warp"] .numChannel:not([data-sys="warp"]),
+.numSvg[data-mode="warp"] .numGate:not([data-sys="warp"]),
+.numSvg[data-mode="warp"] .numZone:not([data-sys="warp"]),
+.numSvg[data-mode="plex"] .numCurrent:not([data-sys="plex"]),
+.numSvg[data-mode="plex"] .numChannel:not([data-sys="plex"]),
+.numSvg[data-mode="plex"] .numGate:not([data-sys="plex"]),
+.numSvg[data-mode="plex"] .numZone:not([data-sys="plex"]) {
+	opacity: 0.32;
+}
+
+.numSvg[data-layer-currents="0"] .numLayerCurrents,
+.numSvg[data-layer-gates="0"] .numLayerGates,
+.numSvg[data-layer-gates="0"] .numLayerChannels,
+.numSvg[data-layer-zones="0"] .numLayerZones { display: none; }
+
+/* SYZYGIES off hides only the currents that express them, leaving the gates
+ * and channels - the secondary traffic - visible on their own. */
+.numSvg[data-layer-syzygies="0"] .numLayerCurrents { opacity: 0.22; }
+
+/* ---- annotation: typography, not a panel ------------------------------- */
+
+.numAnnot {
+	margin: 0;
+	max-width: 100%;
+	font-size: 0.76em;
+	font-weight: 500;
+	letter-spacing: 0.15em;
+	line-height: 1.5;
+	color: var(--num-ink);
+	min-height: 1.5em;
+}
+.numAnnotHead { font-weight: 700; letter-spacing: 0.24em; }
+.numAnnotFoot { opacity: 0.6; }
+.numAnnotIdle { opacity: 0.55; }
+
+/* SELECTED / RELATION / ARITHMETIC / STRUCTURES. The label column is set
+ * lighter than its value so the eye reads the values first. */
+.numAnnotGroup { margin-bottom: 0.7em; }
+.numAnnotLabel {
+	font-size: 0.88em;
+	font-weight: 600;
+	letter-spacing: 0.2em;
+	opacity: 0.55;
+}
+.numAnnotRow { display: flex; gap: 0.6em; }
+.numAnnotRow > span:first-child { flex: 0 0 5.4em; opacity: 0.55; }
+.numAnnotExp {
+	margin-top: 0.5em;
+	font-size: 0.86em;
+	letter-spacing: 0.14em;
+	opacity: 0.55;
+}
+
+/* ---- controls: text, set in a row, no containers ----------------------- */
+
+.numCtlRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.9em 1.15em;
+	max-width: 100%;
+	margin: 1.1em 0 0;
+}
+.numCtl {
+	background: none;
+	border: none;
+	padding: 0;
+	margin: 0;
+	font-family: inherit;
+	font-size: 0.74em;
+	font-weight: 600;
+	letter-spacing: 0.19em;
+	color: var(--num-ink);
+	opacity: 0.45;
+	cursor: pointer;
+	text-transform: uppercase;
+}
+.numCtl:hover { opacity: 0.8; }
+.numCtl.numCtlOn { opacity: 1; box-shadow: 0 2px 0 0 var(--num-ink); }
+.numCtlPlain { opacity: 0.65; }
+.numCtl:focus-visible { outline: 2px solid var(--num-ink); outline-offset: 3px; }
+
+.numNumberRow { align-items: baseline; gap: 0.7em; }
+.numNumberInput {
+	background: none;
+	border: none;
+	border-bottom: 2px solid var(--num-ink);
+	color: var(--num-ink);
+	font-family: inherit;
+	font-size: 0.86em;
+	font-weight: 600;
+	letter-spacing: 0.2em;
+	width: 6.5em;
+	padding: 0.15em 0;
+	border-radius: 0;
+}
+.numNumberInput:focus { outline: none; border-bottom-width: 4px; }
+.numNumberOut { margin-top: 0.6em; }
+
+/* ---- the note about the reference -------------------------------------
+ * Outside the field, in the site's own voice, so it cannot be mistaken for
+ * part of the diagram. */
+
+/* The panel around this is sized to fit its contents, and a paragraph's
+ * max-content width is the whole sentence on one line - which was stretching
+ * that panel to the full width of the page and leaving the green field adrift
+ * in the middle of it. width:0 keeps the note out of the intrinsic size;
+ * min-width:100% then fills whatever the field settled on. */
+.numNote {
+	text-align: left;
+	width: 0;
+	min-width: 100%;
+	box-sizing: border-box;
+	margin: 1.1em 0 0;
+	padding: 0 0.2em;
+	font-size: 0.82em;
+	line-height: 1.6;
+	color: var(--text-3, #a1a1a1);
+}
+
+/* ---- motion ------------------------------------------------------------
+ * There is none by default. A lit current traces once when it is selected,
+ * and that is the only animation in the feature. */
+
+@keyframes numTrace {
+	from { stroke-dashoffset: 320; }
+	to { stroke-dashoffset: 0; }
+}
+.numCurrent.numOn .numCurLine,
+.numChannel.numOn .numChLine {
+	stroke-dasharray: 320;
+	animation: numTrace 0.75s ease-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.numCurrent.numOn .numCurLine,
+	.numChannel.numOn .numChLine {
+		stroke-dasharray: none;
+		animation: none;
+	}
+}
+
+/* ---- narrow screens ----------------------------------------------------
+ *
+ * The figure keeps its proportions and its vertical arrangement; it simply
+ * gets smaller. Nothing is rearranged, nothing is dropped. Touch targets are
+ * handled by the SVG scaling with the viewport rather than by enlarging the
+ * circles, so the composition is unchanged.
+ */
+
+/* Narrow: the annotation goes back under the diagram, which is the only
+ * arrangement that keeps the figure a usable size on a phone. */
+@media (max-width: 620px) {
+	.numBody { display: block; overflow: visible; }
+	/* the two diagrams stack rather than squeezing side by side */
+	.numStage { flex-direction: column; align-items: center; gap: 1.1em; }
+	.numPanelGeo { flex: 0 0 auto; width: 100%; max-width: 20em; }
+	.numGeoSvg { height: auto; max-height: 46vh; }
+	.numSide { margin-top: 1.1em; }
+	.numStage { justify-content: center; }
+	.numSvg { height: auto; width: 100%; max-height: 58vh; }
+}
+
+@media (max-width: 560px) {
+	.numField { padding: 1em; }
+	.numSvg { height: 48vh; min-height: 260px; }
+	.numCtlRow { gap: 0.9em; }
+	.numAnnot { font-size: 0.72em; letter-spacing: 0.12em; }
+	.numTitleMain { font-size: 0.95em; letter-spacing: 0.26em; }
+	.numNote { padding: 0 1em; }
+}
+
+/* A short window - a laptop, or the panel opened low - shrinks the figure
+ * rather than pushing the controls off the bottom. */
+@media (max-height: 760px) {
+	.numField { padding: 1em; }
+	.numAnnot { font-size: 0.72em; }
+	.numCtlRow { margin-top: 0.8em; }
+}
+
+/* ---- the reading: labels, values, provenance --------------------------
+ *
+ * Editorial annotation rather than an application panel: a small label, the
+ * value under it, and a status line wherever the claim is not plain Numogram
+ * structure. No boxes, no rules, no containers.
+ */
+
+.numAnnotBig {
+	font-size: 1.6em;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	line-height: 1.1;
+	margin: 0.1em 0 0.15em;
+}
+
+/* Provenance. Three statuses, distinguished by weight and opacity only - the
+ * field is green and black, and a status tag is not a reason to break that. */
+.numStatus {
+	font-size: 0.78em;
+	font-weight: 600;
+	letter-spacing: 0.16em;
+	margin: -0.35em 0 0.7em;
+	opacity: 0.5;
+}
+.numStatus-canonical { opacity: 0.5; }
+.numStatus-attested { opacity: 0.66; }
+.numStatus-experimental {
+	opacity: 0.85;
+	box-shadow: inset 0 -1px 0 0 currentColor;
+	display: inline-block;
+	padding-bottom: 1px;
+}
+
+/* AQ character values, set as a run rather than a table - it is a reading of
+ * a word, so it should read along the line like one. */
+.numChars { display: flex; flex-wrap: wrap; gap: 0.5em 0.75em; margin: 0.15em 0 0.4em; }
+.numChar {
+	font-size: 0.92em;
+	letter-spacing: 0.06em;
+	white-space: nowrap;
+}
+.numChar b { font-weight: 700; margin-left: 0.28em; }
+
+/* ---- the trace input --------------------------------------------------- */
+
+.numTraceHead { align-items: baseline; gap: 1em; margin-top: 1.4em; }
+.numTraceHead .numAnnotLabel { margin: 0; }
+.numTraceMsg {
+	font-size: 0.74em;
+	font-weight: 600;
+	letter-spacing: 0.16em;
+	margin-top: 0.4em;
+	min-height: 1.1em;
+	opacity: 0.8;
+}
+
+/* ---- recent traces ----------------------------------------------------- */
+
+.numHistory { margin-top: 1.2em; display: flex; flex-wrap: wrap; gap: 0.5em 0.9em; align-items: baseline; }
+.numHistory .numAnnotLabel { flex: 0 0 100%; margin-bottom: 0.1em; }
+.numHistBtn {
+	background: none;
+	border: none;
+	padding: 0;
+	font-family: inherit;
+	font-size: 0.74em;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	color: var(--num-ink);
+	opacity: 0.55;
+	cursor: pointer;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.numHistBtn:hover { opacity: 0.9; }
+.numHistBtn:focus-visible { outline: 2px solid var(--num-ink); outline-offset: 2px; }
+
+/* ---- sources, folded away ---------------------------------------------- */
+
+.numDetails {
+	margin-top: 1.4em;
+	border-top: 1px solid currentColor;
+	padding-top: 0.8em;
+	color: var(--num-ink);
+	opacity: 0.85;
+}
+.numDetails > summary {
+	cursor: pointer;
+	font-size: 0.74em;
+	font-weight: 600;
+	letter-spacing: 0.22em;
+	opacity: 0.7;
+	list-style: none;
+}
+.numDetails > summary::-webkit-details-marker { display: none; }
+.numDetails > summary::before { content: "+ "; }
+.numDetails[open] > summary::before { content: "\2212 "; }
+.numDetails > summary:focus-visible { outline: 2px solid var(--num-ink); outline-offset: 3px; }
+.numDetailsBody { margin-top: 0.9em; column-gap: 2.2em; }
+.numSrc { margin-bottom: 1em; break-inside: avoid; }
+.numSrcClaim { font-size: 0.82em; line-height: 1.5; }
+.numSrcFrom { font-size: 0.78em; line-height: 1.5; opacity: 0.62; margin-top: 0.25em; }
+
+@media (min-width: 760px) {
+	.numDetailsBody { column-count: 2; }
+}
+
+/* ---- the geocentric overlay (experimental) ----------------------------
+ *
+ * Secondary to the Numogram throughout: thinner than any canonical line,
+ * lower in contrast, and drawn underneath the zones so it can never cover
+ * them. With the mode off none of this is rendered at all, so the canonical
+ * diagram is exactly what it was.
+ */
+
+.numGeoSphere {
+	fill: none;
+	stroke: var(--num-ink);
+	stroke-width: 1.2;
+	opacity: 0.5;
+	vector-effect: non-scaling-stroke;
+}
+.numGeoMark {
+	fill: var(--num-field);
+	stroke: var(--num-ink);
+	stroke-width: 1.8;
+	vector-effect: non-scaling-stroke;
+}
+.numGeoDot { fill: var(--num-ink); }
+.numGeoLabel {
+	fill: var(--num-ink);
+	font-family: "Montserrat", Arial, sans-serif;
+	font-size: 21px;
+	font-weight: 600;
+	letter-spacing: 0.1em;
+	opacity: 0.72;
+	pointer-events: none;
+}
+
+/* The tie from a body to the zone the Planetwork gives it. Dashed, because it
+ * is a correspondence this application is drawing between two systems - not a
+ * current, not a channel, and not anything either system asserts. */
+.numGeoTie {
+	fill: none;
+	stroke: var(--num-ink);
+	stroke-width: 1.2;
+	stroke-dasharray: 3 6;
+	opacity: 0.45;
+	vector-effect: non-scaling-stroke;
+}
+
+.numGeoBody { cursor: pointer; }
+.numGeoBody:focus { outline: none; }
+.numGeoBody:hover .numGeoSphere,
+.numGeoBody:focus-visible .numGeoSphere { opacity: 0.9; stroke-width: 2; }
+.numGeoBody:focus-visible .numGeoMark { stroke-dasharray: 3 3; }
+
+.numGeoBody.numOn .numGeoSphere { opacity: 1; stroke-width: 2.4; }
+.numGeoBody.numOn .numGeoMark { fill: var(--num-ink); }
+.numGeoBody.numOn .numGeoLabel { opacity: 1; font-weight: 700; }
+.numGeoBody.numOn .numGeoTie { opacity: 0.85; stroke-width: 2; }
+
+/* Deferent and epicycle, drawn for a selected superior planet. Schematic
+ * geometry showing why the model produces an apparent reversal - not a
+ * simulation, and not Ptolemy's own figures. */
+.numGeoEpicycle {
+	fill: none;
+	stroke: var(--num-ink);
+	stroke-width: 1.6;
+	vector-effect: non-scaling-stroke;
+}
+.numGeoApparent {
+	fill: none;
+	stroke: var(--num-ink);
+	stroke-width: 2.2;
+	stroke-linecap: round;
+	vector-effect: non-scaling-stroke;
+}
+
+/* Post-Ptolemaic bodies are held at arm's length even in the drawing. */
+.numGeoBody[data-set="extended"] .numGeoSphere { stroke-dasharray: 8 7; }
+.numGeoBody[data-set="extended"] .numGeoLabel { opacity: 0.55; }
+
+/* ---- the mode's own standing note -------------------------------------- */
+
+.numCosmoRow { align-items: baseline; gap: 1em; margin-top: 1.4em; }
+.numCosmoRow .numAnnotLabel { margin: 0; }
+.numGeoSetRow { margin-top: 0.5em; }
+.numGeoNote {
+	font-size: 0.72em;
+	line-height: 1.5;
+	letter-spacing: 0.04em;
+	margin-top: 0.6em;
+	opacity: 0.72;
+}
+.numGeoNote:empty { margin-top: 0; }
+
+/* ---- information containers -------------------------------------------
+ *
+ * Quiet research sections, not dashboard cards: one hairline rule above each,
+ * a small label, then the values. No fill, no radius, no shadow, no badge.
+ */
+
+.numBox {
+	border-top: 1px solid currentColor;
+	padding-top: 0.55em;
+	margin-bottom: 0.9em;
+	opacity: 1;
+}
+.numBox:first-child { border-top: none; padding-top: 0; }
+.numBoxLabel {
+	margin: 0 0 0.3em;
+	font-size: 0.72em;
+	font-weight: 600;
+	letter-spacing: 0.2em;
+	opacity: 0.55;
+	text-transform: uppercase;
+}
+/* the rule is what separates sections, so a status tag sits tight under its
+ * own box rather than floating between two */
+.numBox + .numStatus { margin: -0.7em 0 0.9em; }
+
+/* ---- the cosmology selector -------------------------------------------- */
+
+.numSelect {
+	background: none;
+	border: none;
+	border-bottom: 1px solid currentColor;
+	border-radius: 0;
+	color: var(--num-ink);
+	font-family: inherit;
+	font-size: 0.78em;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	padding: 0.1em 1.2em 0.15em 0;
+	cursor: pointer;
+	/* the site's own select styling would bring a panel background in with it */
+	-webkit-appearance: none;
+	appearance: none;
+	background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+	                  linear-gradient(135deg, currentColor 50%, transparent 50%);
+	background-position: right 4px center, right 0px center;
+	background-size: 4px 4px, 4px 4px;
+	background-repeat: no-repeat;
+}
+.numSelect:focus-visible { outline: 2px solid var(--num-ink); outline-offset: 3px; }
+/* the option list is drawn by the platform, so it needs real colours */
+.numSelect option { background: #101010; color: #ededed; }
+
+.numCosmoRow, .numGeoSetRow { align-items: baseline; gap: 0.9em; margin-top: 1.2em; }
+.numCosmoRow .numAnnotLabel,
+.numGeoSetRow .numAnnotLabel { margin: 0; }
+
+/* ---- the direction marks ----------------------------------------------
+ * The small solid triangle the reference draws inside every zone. Purely
+ * visual: it never takes a pointer event. */
+.numZoneMark { fill: var(--num-ink); stroke: none; pointer-events: none; }
+.numZone.numOn .numZoneMark { fill: var(--num-field); }
+
+/* ---- hit areas ---------------------------------------------------------
+ *
+ * The visible linework is thin, and a thin stroke is a poor target. These sit
+ * over the artwork, take the pointer events, and are invisible - the design
+ * is unchanged, only the reach of the cursor is.
+ */
+.numHit {
+	fill: transparent;
+	stroke: none;
+	pointer-events: all;
+	cursor: pointer;
+}
+.numHitLine {
+	fill: none;
+	stroke: transparent;
+	stroke-width: 16;
+	stroke-linecap: round;
+	pointer-events: stroke;
+	cursor: pointer;
+	vector-effect: non-scaling-stroke;
+}
+
+/* The visible parts no longer need to catch anything, so a click in the
+ * middle of a zone cannot be swallowed by the ring or the numeral. */
+.numZoneRing, .numGateRing, .numZoneText, .numGateText,
+.numCurValRing, .numCurValText, .numCurLine, .numCurBody, .numCurHead,
+.numChLine, .numChHead { pointer-events: none; }
+
+.numGate { cursor: pointer; }
+.numGate:focus-visible .numGateRing { stroke-dasharray: 3 3; }
+
+/* ---- the geocentric panel: radial bands -------------------------------
+ *
+ * One band per body. Concentric rings put two labels on the same circle and
+ * they collided; a band per body cannot. Earth is on the floor and the
+ * spheres rise from it in the Ptolemaic order.
+ *
+ * Every stroke here is lighter than the canonical linework: this is the
+ * secondary model and it must read as secondary.
+ */
+
+.numBandLine {
+	stroke: var(--num-ink);
+	stroke-width: 1.2;
+	opacity: 0.45;
+	vector-effect: non-scaling-stroke;
+}
+.numBandMark { fill: var(--num-field); stroke: var(--num-ink); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.numBandEarthDot { fill: var(--num-ink); stroke: none; }
+
+.numBandName {
+	fill: var(--num-ink);
+	font-family: "Montserrat", Arial, sans-serif;
+	font-size: 22px;
+	font-weight: 600;
+	letter-spacing: 0.1em;
+	text-anchor: start;
+	pointer-events: none;
+}
+.numBandRole {
+	fill: var(--num-ink);
+	font-family: "Montserrat", Arial, sans-serif;
+	font-size: 17px;
+	font-weight: 500;
+	letter-spacing: 0.08em;
+	text-anchor: end;
+	opacity: 0.55;
+	pointer-events: none;
+}
+.numBandNote {
+	fill: var(--num-ink);
+	font-family: "Montserrat", Arial, sans-serif;
+	font-size: 14px;
+	font-weight: 600;
+	letter-spacing: 0.16em;
+	text-anchor: middle;
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+.numBandEarth .numBandName { font-weight: 700; }
+.numBandEarth .numBandLine { opacity: 0.85; stroke-width: 2; }
+
+.numBand { cursor: pointer; }
+.numBand:focus { outline: none; }
+.numBand:hover .numBandLine { opacity: 0.85; }
+.numBand:focus-visible .numBandLine { opacity: 1; stroke-dasharray: 5 4; }
+.numBand.numOn .numBandLine { opacity: 1; stroke-width: 2.6; }
+.numBand.numOn .numBandName { font-weight: 700; }
+.numBand.numOn .numBandMark { fill: var(--num-ink); }
+.numBand.numOn .numBandRole { opacity: 0.9; }
+
+/* post-Ptolemaic bodies are held at arm's length in the drawing too */
+.numBand[data-set="extended"] .numBandLine { stroke-dasharray: 8 7; }
+.numBand[data-set="extended"] .numBandName { opacity: 0.62; }
+
+/* the one tie, drawn only for the selected body in cross-map */
+.numBandTie {
+	stroke: var(--num-ink);
+	stroke-width: 1.6;
+	fill: none;
+	vector-effect: non-scaling-stroke;
+}
+.numBandTieText {
+	fill: var(--num-ink);
+	font-family: "Montserrat", Arial, sans-serif;
+	font-size: 15px;
+	font-weight: 700;
+	letter-spacing: 0.1em;
+	text-anchor: end;
+	pointer-events: none;
+}
+
+/* ---- information containers become real boxes ------------------------- */
+
+.numBox {
+	border: 1px solid currentColor;
+	border-top: 1px solid currentColor;
+	padding: 0.6em 0.75em 0.7em;
+	margin-bottom: 0.8em;
+}
+.numBox:first-child { border-top: 1px solid currentColor; padding-top: 0.6em; }
+.numBox + .numStatus { margin: -0.45em 0 0.8em 0.1em; }

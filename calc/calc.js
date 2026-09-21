@@ -267,6 +267,7 @@ function closeAllOpenedMenus() {
 	if (typeof astroMenuOpened !== "undefined" && astroMenuOpened) toggleAstroMenu() // Astrology
 	if (typeof profileMenuOpened !== "undefined" && profileMenuOpened) toggleProfileMenu() // Profile
 	if (typeof masterDecoderMenuOpened !== "undefined" && masterDecoderMenuOpened) toggleMasterDecoderMenu() // Master Decoder
+	if (typeof numogramMenuOpened !== "undefined" && numogramMenuOpened) toggleNumogramMenu() // Numogram
 }
 
 // ========================= Random Colors ==========================
@@ -1249,6 +1250,8 @@ function createFeaturesMenu() {
 	o += '<input class="intBtn" type="button" value="&#127756; Astrology" onclick="toggleAstroMenu()">'
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input class="intBtn" type="button" value="&#128377;&#65039; Master Decoder" onclick="toggleMasterDecoderMenu()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="&#11042; Numogram" onclick="toggleNumogramMenu()">'
 	o += '</div>'
 	o += '</div>'
 	document.getElementById("calcOptionsPanel").innerHTML = o
