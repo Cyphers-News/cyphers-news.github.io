@@ -99,12 +99,13 @@ function importFileAction(file, hasLocalFile) {
 			ciph = file.split(",new cipher") // split string into array
 
 			cipherList = []; cCat = []; defaultCipherArray = [] // clear arrays with previously defined ciphers, categories, default ciphers
-			for (n = 0; n < ciph.length; n++) {
-				cipherList.push(eval("new cipher("+ciph[n].slice(1,-1)+")")) // remove parethesis, evaluate string as javascript code
-			}
+			// Parsed as JSON and type-checked rather than eval()d. See the security
+			// note above ciphersFromListBody() in gematria.js — this is the path an
+			// imported file takes, and it used to execute that file as code.
+			cipherList = ciphersFromListBody(file)
 			document.getElementById("calcOptionsPanel").innerHTML = "" // clear menu panel
 			
-			initCalc() // reinit.
+			initCalc(false, true) // reinit, keeping the imported cipher selection
 			
 			updateTables() // update tables
 			updateInterfaceColor(true) // update interface color (first run)
@@ -149,11 +150,12 @@ function importFileAction(file, hasLocalFile) {
 			ciph = file.split(",new cipher") // split string into array
 
 			cipherList = []; cCat = []; defaultCipherArray = [] // clear arrays with previously defined ciphers, categories, default ciphers
-			for (n = 0; n < ciph.length; n++) {
-				cipherList.push(eval("new cipher("+ciph[n].slice(1,-1)+")")) // remove parethesis, evaluate string as javascript code
-			}
+			// Parsed as JSON and type-checked rather than eval()d. See the security
+			// note above ciphersFromListBody() in gematria.js — this is the path an
+			// imported file takes, and it used to execute that file as code.
+			cipherList = ciphersFromListBody(file)
 			document.getElementById("calcOptionsPanel").innerHTML = "" // clear menu panel
-			initCalc() // reinit
+			initCalc(false, true) // reinit, keeping the imported cipher selection
 			updateTables() // update tables
 			updateInterfaceColor() // update interface color
 
@@ -240,9 +242,62 @@ function isJsonString(str) {
     return true;
 }
 
+// The permitted option names, derived from the same array the exporter writes
+// from, so there is one list rather than two that drift apart. Each entry looks
+// like "'optNumCalcMethod'+' = '+optNumCalcMethod"; the leading quoted token is
+// the name.
+function calcOptionNames() {
+	var names = []
+	if (typeof calcOptionsArr === "undefined") return names
+	for (var i = 0; i < calcOptionsArr.length; i++) {
+		var m = /^'([A-Za-z_$][\w$]*)'/.exec(String(calcOptionsArr[i]))
+		if (m !== null) names.push(m[1])
+	}
+	return names
+}
+
+// SECURITY. This used to be:
+//
+//     for (var i = 0; i < calcOpt.length; i++) eval(calcOpt[i])
+//
+// where calcOpt is the calcOptions block read straight out of an imported
+// settings file. Every line was executed as JavaScript, so a file containing
+// one crafted entry ran arbitrary code in the member's origin - the same
+// account-takeover path the cipher list had, in the half of the blob that got
+// less attention because the values looked like plain numbers.
+//
+// An option line is "name = jsonValue" and nothing more. The name is checked
+// against the exporter's own list and the value is JSON, so an entry naming
+// something that is not an option, or carrying anything JSON cannot express,
+// is skipped rather than run.
 function importCalcOptions(calcOpt) { // load user options
-	if (typeof calcOpt !== 'undefined' && calcOpt !== null) {
-		for (var i = 0; i < calcOpt.length; i++) eval(calcOpt[i])
+	if (Array.isArray(calcOpt)) {
+		var allowed = calcOptionNames()
+		var skipped = 0
+
+		for (var i = 0; i < calcOpt.length; i++) {
+			var line = String(calcOpt[i])
+			var eq = line.indexOf(" = ")
+			if (eq < 1) { skipped++; continue }
+
+			var name = line.slice(0, eq)
+			// An unknown name is the whole attack: without this check the value
+			// could be assigned over any global on the page.
+			if (allowed.indexOf(name) === -1) { skipped++; continue }
+
+			var value
+			try {
+				// captions and coderainStyle are exported JSON.stringify'd, so
+				// every value on the right of the separator is valid JSON
+				value = JSON.parse(line.slice(eq + 3))
+			} catch (e) { skipped++; continue }
+
+			// these are top-level `var`s in calc.js, so they are window
+			// properties - the same target the assignment used to reach
+			window[name] = value
+		}
+
+		if (skipped > 0) console.warn("Import: " + skipped + " option(s) skipped as unrecognised.")
 	}
 	toggleCodeRain() // update coderain
 }
@@ -274,7 +329,7 @@ function buildHistoryCSV(arr, dbMode = false, addCiphers = '') {
 
 	// table contents
 	for (i = 0; i < arr.length; i++) {
-		t += arr[i].replace(";", "") // add phrase, remove semicolons (it is a separator)
+		t += arr[i].replace(/;/g, "") // add phrase, remove semicolons (it is the separator) - every one, not just the first
 		for (n = 0; n < cipherList.length; n++) {
 			if (cipherList[n].enabled) {
 				t += ";"+cipherList[n].calcGematria(arr[i]) // gematria value for each enabled cipher
@@ -286,22 +341,29 @@ function buildHistoryCSV(arr, dbMode = false, addCiphers = '') {
 	return t
 }
 
+// The history and DB-query exports are CSV (semicolon-separated), so they are
+// saved as .csv, with a UTF-8 byte order mark so a spreadsheet reads accented
+// and non-Latin phrases correctly. Import reads them back the same way: it goes
+// by content, not extension, and the file reader drops the mark.
+var CSV_BOM = "\uFEFF"
+
 function exportHistoryCSV(arr, dbMode = false, addCiphers = '') {
-	if (arr.length == 0) return
+	if (arr.length == 0) { if (!dbMode) displayCalcNotification("The history table is empty", 2000); return }
 
 	var t = buildHistoryCSV(arr, dbMode, addCiphers)
 
-	t = 'data:text/plain;charset=utf-8,'+encodeURIComponent(t) // format as text file
 	if (dbMode) {
+		t = 'data:text/plain;charset=utf-8,'+encodeURIComponent(t) // format as text file
 		download(getTimestamp()+"_GEMATRO_DB.txt", t); // download database
 	} else {
-		download(getTimestamp()+"_gematria.txt", t); // download file
+		t = 'data:text/csv;charset=utf-8,'+encodeURIComponent(CSV_BOM + t)
+		download(getTimestamp()+"_gematria.csv", t); // download file
 	}
 }
 
 function exportCurrentDBquery(arr) {
 	var i, n
-	if (arr.length == 0) return
+	if (!arr || arr.length == 0) { displayCalcNotification("Run a database query first", 2000); return }
 
 	var t = ""
 
@@ -315,7 +377,7 @@ function exportCurrentDBquery(arr) {
 	if (encodingMenuOpened) {
 		var tLine = ''
 		for (i = 0; i < arr.length; i++) {
-			tLine = arr[i] + ';'
+			tLine = String(arr[i]).replace(/;/g, "") + ';' // semicolons are the separator
 			for (n = 0; n < gemArrCiph.length; n++) {
 				tLine += cipherList[gemArrCiph[n]].calcGematria(arr[i]) + ';'
 			}
@@ -323,7 +385,7 @@ function exportCurrentDBquery(arr) {
 		}
 	} else { // table contents
 		for (i = 0; i < arr.length; i++) {
-			t += arr[i][1].replace(";", "") // add phrase[1], remove semicolons (it is a separator)
+			t += String(arr[i][1]).replace(/;/g, "") // add phrase[1], remove semicolons (it is the separator) - every one
 			for (n = 2; n < arr[i].length; n++) { // values start at [2]
 				t += ";"+arr[i][n] // retrieve gematria value for each cipher
 			}
@@ -331,8 +393,8 @@ function exportCurrentDBquery(arr) {
 		}
 	}
 	
-	t = 'data:text/plain;charset=utf-8,'+encodeURIComponent(t.slice(0,-1)) // format as text file
-	download(getTimestamp()+"_gematria_DB_query.txt", t); // download file
+	t = 'data:text/csv;charset=utf-8,'+encodeURIComponent(CSV_BOM + t.slice(0,-1))
+	download(getTimestamp()+"_gematria_DB_query.csv", t); // download file
 }
 
 function download(fileName, fileData) {

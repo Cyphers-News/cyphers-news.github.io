@@ -19,7 +19,7 @@ cipherList = [
 	
 	new cipher(
 		"Ordinal",
-		"English",
+		"Base-4",
 		120, 65, 62,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26],
@@ -30,7 +30,7 @@ cipherList = [
 
 	new cipher(
 		"Reduction",
-		"English",
+		"Base-4",
 		216, 95, 73,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,2,3,4,5,6,7,8,9,1,2,3,4,5,6,7,8,9,1,2,3,4,5,6,7,8],
@@ -44,7 +44,7 @@ cipherList = [
 	
 	new cipher(
 		"Standard",
-		"English",
+		"CCRU",
 		50, 78, 63,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,800],
@@ -53,9 +53,91 @@ cipherList = [
 		false
 	),
 
+	// Based Atlanteanism with the divide applied - Standard minus Alphanumeric
+	// Qabbala, over 9. The two ciphers it is built from are its neighbours
+	// here, which is why it is pinned beside them rather than left to fall
+	// wherever the file order puts it.
+	//
+	// Worked through for one letter: h is 8 in Standard and 17 in AQ, so
+	// 8 - 17 = -9, and -9 / 9 = -1. Every letter divides by 9 exactly, so
+	// this table is the undivided one (a..j = -9 ... y = 666, z = 765) to
+	// scale, carrying the same information in smaller numbers.
+	//
+	// "hello" = -1 -1 +1 +1 +4 = 4, the same 4 that comes out of doing it
+	// the long way round: Standard 133 - AQ 97 = 36, 36 / 9 = 4.
+	//
+	// a..j are negative and k is 0, so unlike every other cipher here a
+	// phrase can total zero or less ("cabbage" is -7). That is correct
+	// arithmetic, not a bug: reductionChain (calc.js) leaves anything at or
+	// below 9 alone, so a negative total simply does not reduce.
+	//
+	// Digits are 0 rather than absent. Standard has no digits and falls back
+	// to face value, Alphanumeric Qabbala defines them AS face value, so the
+	// two cancel - the subtraction genuinely gives nothing for a digit. Left
+	// out of the table, the app's own face-value fallback would have added
+	// them unscaled and broken the 9x relationship with the cipher below.
+	new cipher(
+		"Based Atlanteanism Denovated",
+		"CCRU",
+		// #3dffe5 - bright aquamarine, a lighter teal than Based Atlanteanism
+		// (162 62% 56%) sitting next to it. Distances: Based Atlanteanism 73,
+		// Reverse Reduction 75, Synx 87, Reduction 104, Reverse Ordinal 122,
+		// Ordinal 142.
+		//
+		// Light teal is the most crowded part of this palette - Synx and
+		// Reverse Reduction are both pale cyan at L66/69 - so full saturation
+		// is what keeps this readable as its own colour. Going lighter still
+		// collapses into Reverse Reduction: L68 drops the nearest neighbour to
+		// 49 and L70 to 36, at which point the two are hard to tell apart.
+		// L62 is about as light as this can go and stay distinct.
+		172, 100, 62,
+		[48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
+		[0,0,0,0,0,0,0,0,0,0,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,1,2,3,4,5,6,7,8,19,30,41,52,63,74,85],
+		true,
+		false,
+		false,
+		// shows the working in the breakdown box: ((133 - 97) = 36) / 9 = 4
+		{ from: "Standard", minus: "Alphanumeric Qabbala", over: 9 }
+	),
+
+	// Based Atlanteanism proper: Standard minus Alphanumeric Qabbala, with no
+	// divide. This is the headline cipher of the pair - "truth" is 666 here
+	// and 74 in the Denovated one above, and the 666 is the number people are
+	// actually looking for. Same for "Remigration Spirit".
+	//
+	// A separate cipher rather than a second number bolted onto the Reduced
+	// one, because every part of the app that looks up a value - Matches, the
+	// database query, encoding, export - walks the enabled ciphers and asks
+	// each for calcGematria(). Being an ordinary cipher makes this searchable
+	// everywhere for free; teaching one cipher to report two numbers would
+	// mean changing all of those instead.
+	//
+	// Worth knowing: this and Denovated are the same cipher to scale, so they
+	// always agree on WHICH phrases match - searching 666 here returns the
+	// same set as searching 74 there. The difference is what the number
+	// looks like, not what it finds.
+	//
+	// Note y is 666 on its own, so a phrase that is just "y" scores it too.
+	new cipher(
+		"Based Atlanteanism",
+		"CCRU",
+		// deeper, more saturated teal: far enough from Denovated's green
+		// to read as a different cipher at a glance, and pulled off Synx's
+		// pale cyan (180 44% 66%) in hue, saturation and lightness at once,
+		// since those two sit side by side in this category
+		156, 80, 62,
+		[48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
+		[0,0,0,0,0,0,0,0,0,0,-9,-9,-9,-9,-9,-9,-9,-9,-9,-9,0,9,18,27,36,45,54,63,72,171,270,369,468,567,666,765],
+		true,
+		false,
+		false,
+		// no `over`, so the box reads (798 - 132) = 666 with no divide step
+		{ from: "Standard", minus: "Alphanumeric Qabbala" }
+	),
+
 	new cipher(
 		"Standard Alternative",
-		"English",
+		"Extra",
 		43, 80, 56,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170],
@@ -67,7 +149,7 @@ cipherList = [
 
 	new cipher(
 		"Capitals Mixed",
-		"English",
+		"Extra",
 		117, 42, 54,
 		[65,97,66,98,67,99,68,100,69,101,70,102,71,103,72,104,73,105,74,106,75,107,76,108,77,109,78,110,79,111,80,112,81,113,82,114,83,115,84,116,85,117,86,118,87,119,88,120,89,121,90,122],
 		[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52],
@@ -83,7 +165,7 @@ cipherList = [
 
 	new cipher(
 		"Reverse Ordinal",
-		"Reverse",
+		"Base-4",
 		146, 74, 50,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1],
@@ -94,7 +176,7 @@ cipherList = [
 
 	new cipher(
 		"Reverse Reduction",
-		"Reverse",
+		"Base-4",
 		180, 60, 69,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[8,7,6,5,4,3,2,1,9,8,7,6,5,4,3,2,1,9,8,7,6,5,4,3,2,1],
@@ -138,7 +220,7 @@ cipherList = [
 
 	new cipher(
 		"EP Exception",
-		"Reverse",
+		"Extra",
 		165, 40, 56,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[8,7,6,5,22,3,2,1,9,8,7,6,5,4,3,11,1,9,8,7,6,5,4,3,2,1],
@@ -149,7 +231,7 @@ cipherList = [
 
 	new cipher(
 		"EHP Exception",
-		"Reverse",
+		"Extra",
 		144, 21, 54,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[8,7,6,5,22,3,2,10,9,8,7,6,5,4,3,11,1,9,8,7,6,5,4,3,2,1],
@@ -466,7 +548,7 @@ cipherList = [
 
 	new cipher(
 		"Alphanumeric Satanic",
-		"CCRU",
+		"Alphanumeric",
 		32, 68, 62,
 		[48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90],
 		[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61],
@@ -477,7 +559,7 @@ cipherList = [
 
 	new cipher(
 		"Alphanumeric Primes",
-		"CCRU",
+		"Alphanumeric",
 		34, 53, 73,
 		[48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103,107,109,113,127,131,137,139,149],
@@ -488,7 +570,7 @@ cipherList = [
 
 	new cipher(
 		"Alphanumeric Squares",
-		"CCRU",
+		"Alphanumeric",
 		175, 19, 61,
 		[48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[0,1,4,9,16,25,36,49,64,81,100,121,144,169,196,225,256,289,324,361,400,441,484,529,576,625,676,729,784,841,900,961,1024,1089,1156,1225],
@@ -499,7 +581,7 @@ cipherList = [
 
 	new cipher(
 		"Alphanumeric Trigonal",
-		"CCRU",
+		"Alphanumeric",
 		101, 22, 64,
 		[48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[0,1,3,6,10,15,21,28,36,45,55,66,78,91,105,120,136,153,171,190,210,231,253,276,300,325,351,378,406,435,465,496,528,561,595,630],
@@ -511,7 +593,7 @@ cipherList = [
 
 		new cipher(
 		"Archaic Alphanumeric",
-		"CCRU",
+		"Alphanumeric",
 		33, 67, 67,
 		[48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,18,19,20,21,22,23,24,25,26,27,28,29,29,30,31,32,33],
@@ -525,7 +607,7 @@ cipherList = [
 
 	new cipher(
 		"Numeric QWERTY Primes", // cipher name
-		"CCRU", // category
+		"Alphanumeric", // category
 		44, 56, 62, // hue, saturation, lightness
 		[49,50,51,52,53,54,55,56,57,48,113,119,101,114,116,121,117,105,111,112,97,115,100,102,103,104,106,107,108,122,120,99,118,98,110,109], // starts with numeric characters followed by uppercase QWERTY, then lowercase in random order
 		[1,2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103,107,109,113,127,131,137,139,149], // values corresponding to each character
@@ -538,7 +620,7 @@ cipherList = [
 
 	new cipher(
 		"Hex",
-		"Conspiracy",
+		"Illuminati",
 		343, 46, 59,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[6,12,18,24,30,36,42,48,54,60,66,72,78,78,72,66,60,54,48,42,36,30,24,18,12,6],
@@ -550,7 +632,7 @@ cipherList = [
 
 	new cipher(
 		"Illuminati Novice",
-		"Conspiracy",
+		"Illuminati",
 		33, 91, 58,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[12,11,10,9,8,7,6,5,4,4,3,2,1,13,14,15,16,17,18,19,20,20,21,22,23,24],
@@ -561,7 +643,7 @@ cipherList = [
 
 	new cipher(
 		"Illuminati Reverse",
-		"Conspiracy",
+		"Illuminati",
 		60, 53, 62,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[24,23,22,21,20,19,18,17,16,16,15,14,13,1,2,3,4,5,6,7,8,8,9,10,11,12],
@@ -589,7 +671,7 @@ cipherList = [
 
 	new cipher(
 		"Modern Kaye",
-		"Archaic",
+		"Elizabethan",
 		352, 61, 78,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[27,28,29,30,31,32,33,34,35,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26],
@@ -602,7 +684,7 @@ cipherList = [
 
 	new cipher(
 		"Elizabethan 360",
-		"Archaic",
+		"Elizabethan",
 		41, 100, 49,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,2,3,4,5,6,8,9,10,10,12,15,18,20,24,30,36,40,45,60,72,72,90,120,180,360],
@@ -682,7 +764,7 @@ cipherList = [
 
 	new cipher(
 		"Alphanumeric Halves",
-		"CCRU",
+		"Alphanumeric",
 		59, 21, 57,
 		[48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,-17,-16,-15,-14,-13,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,0],
@@ -742,7 +824,7 @@ cipherList = [
 
 	new cipher(
 		"Archaic Ordinal",
-		"Archaic",
+		"Elizabethan",
 		120, 65, 62,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,2,3,4,5,6,7,8,9,9,10,11,12,13,14,15,16,17,18,19,20,20,21,22,23,24],
@@ -753,7 +835,7 @@ cipherList = [
 
 	new cipher(
 		"Archaic Reverse",
-		"Archaic",
+		"Elizabethan",
 		146, 74, 50,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[24,23,22,21,20,19,18,17,16,16,15,14,13,12,11,10,9,8,7,6,5,5,4,3,2,1],
@@ -764,7 +846,7 @@ cipherList = [
 
 	new cipher(
 		"Archaic Reduction",
-		"Archaic",
+		"Elizabethan",
 		180, 60, 69,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,2,3,4,5,6,7,8,9,9,1,2,3,4,5,6,7,8,9,1,2,2,3,4,5,6],
@@ -775,7 +857,7 @@ cipherList = [
 
 	new cipher(
 		"Archaic R Reverse",
-		"Archaic",
+		"Elizabethan",
 		207, 77, 64,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[6,5,4,3,2,1,9,8,7,7,6,5,4,3,2,1,9,8,7,6,5,5,4,3,2,1],
@@ -784,10 +866,40 @@ cipherList = [
 		false
 	),
 
+	// Units, tens, hundreds - the classical arrangement, with i/j sharing 9 and
+	// u/v sharing 200 the way both pairs were a single letter in Latin. That is
+	// also why the values run to 600 across 26 letters rather than 800: two of
+	// the steps are spent twice.
+	new cipher(
+		"Archaic Standard",
+		"Elizabethan",
+		48, 49, 72,
+		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
+		[1,2,3,4,5,6,7,8,9,9,10,20,30,40,50,60,70,80,90,100,200,200,300,400,500,600],
+		true,
+		false,
+		false
+	),
+
+	// The same scale read from z back to a. Written as a reversed character
+	// list against rising values rather than the rising list against falling
+	// values the other Archaic reverses use - the mapping is what matters and
+	// this way the shared pairs stay visible as pairs (v/u at 5, j/i at 70).
+	new cipher(
+		"Archaic R Standard",
+		"Elizabethan",
+		50, 78, 63,
+		[122,121,120,119,118,117,116,115,114,113,112,111,110,109,108,107,106,105,104,103,102,101,100,99,98,97],
+		[1,2,3,4,5,5,6,7,8,9,10,20,30,40,50,60,70,70,80,90,100,200,300,400,500,600],
+		true,
+		false,
+		false
+	),
+
 
 	new cipher(
 		"Bacon Kaye",
-		"Archaic",
+		"Elizabethan",
 		0, 65, 66,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[27,28,29,30,31,32,33,34,35,35,10,11,12,13,14,15,16,17,18,19,20,20,21,22,23,24],
@@ -1280,7 +1392,7 @@ cipherList = [
 
 	new cipher(
 		"Classical Latin Alchemology",
-		"Latin",
+		"Alchemology",
 		134, 92, 75,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,4,7,9,11,12,14,16,19,0,20,23,24,27,28,31,32,35,40,39,0,40,0,45,48,51],
@@ -1435,7 +1547,7 @@ cipherList = [
 
 	new cipher(
 		"Ophiuchus",
-		"Extra",
+		"Experimental",
 		359, 100, 100,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,2,3,4,5,6,7,8,9,10,11,12,13,1,2,3,4,5,6,7,8,9,10,11,12,13],
@@ -1469,7 +1581,7 @@ cipherList = [
 
 	new cipher(
 		"ϕ 1.61 Alchemology",
-		"Maths",
+		"Alchemology",
 		50, 78, 63,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,12,1,16,0,7,7,19,16,16,14,9,19,16,19,9,16,9,16,4,0,9,11,16,12,16],
@@ -1480,7 +1592,7 @@ cipherList = [
 
 	new cipher(
 		"π 3.144 Alchemology",
-		"Maths",
+		"Alchemology",
 		60, 88, 83,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[7,1,9,9,12,0,11,11,1,1,0,4,19,12,19,7,1,9,9,4,14,16,4,7,9,7],
@@ -1527,7 +1639,7 @@ cipherList = [
 
 	new cipher(
 		"Pentagonal",
-		"Maths",
+		"Polygonal",
 		50, 59, 56,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,5,12,22,35,51,70,92,117,145,176,210,247,287,330,376,425,477,532,590,651,715,782,852,925,1001],
@@ -1539,7 +1651,7 @@ cipherList = [
 
 	new cipher(
 		"Hexagonal",
-		"Maths",
+		"Polygonal",
 		52, 60, 54,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,6,15,28,45,66,91,120,153,190,231,276,325,378,435,496,561,630,703,780,861,946,1035,1128,1225,1326],
@@ -1551,7 +1663,7 @@ cipherList = [
 
 	new cipher(
 		"Heptagonal",
-		"Maths",
+		"Polygonal",
 		54, 61, 52,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,7,18,34,55,81,112,148,189,235,286,342,403,469,540,616,697,783,874,970,1071,1177,1288,1404,1525,1651],
@@ -1563,7 +1675,7 @@ cipherList = [
 
 	new cipher(
 		"Octagonal",
-		"Maths",
+		"Polygonal",
 		56, 62, 50,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,8,21,40,65,96,133,176,225,280,341,408,481,560,645,736,833,936,1045,1160,1281,1408,1541,1680,1825,1976],
@@ -1575,7 +1687,7 @@ cipherList = [
 
 	new cipher(
 		"Nonagonal",
-		"Maths",
+		"Polygonal",
 		58, 63, 48,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,9,24,46,75,111,154,204,261,325,396,474,559,651,750,856,969,1089,1216,1350,1491,1639,1794,1956,2125,2301],
@@ -1587,7 +1699,7 @@ cipherList = [
 
 	new cipher(
 		"Decagonal",
-		"Maths",
+		"Polygonal",
 		60, 64, 46,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,10,27,52,85,126,175,232,297,370,451,540,637,742,855,976,1105,1242,1387,1540,1701,1870,2047,2232,2425,2626],
@@ -1600,7 +1712,7 @@ cipherList = [
 
 	new cipher(
 		"Sun & Moon",
-		"Extra",
+		"Experimental",
 		270, 73, 55,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[8,16,24,32,40,48,56,64,72,80,88,96,104,112,120,128,136,144,152,160,168,176,184,192,200,208],
@@ -1624,7 +1736,7 @@ cipherList = [
 
 	new cipher(
 		"Aphrodite",
-		"Extra",
+		"Experimental",
 		0, 100, 59,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100,105,110,115,120,125,130],
@@ -1635,7 +1747,7 @@ cipherList = [
 
 	new cipher(
 		"Aphrodite Reduced",
-		"Extra",
+		"Experimental",
 		0, 100, 55,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[5,1,6,2,7,3,8,4,9,5,1,6,2,7,3,8,4,9,5,1,6,2,7,3,8,4],
@@ -1646,7 +1758,7 @@ cipherList = [
 
 	new cipher(
 		"Scrabble",
-		"Extra",
+		"Experimental",
 		100, 65, 62,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,3,3,2,1,4,2,4,1,8,5,1,3,1,1,3,10,1,1,1,1,4,4,8,4,10],
@@ -1657,7 +1769,7 @@ cipherList = [
 
 	new cipher(
 		"English Alchemology",
-		"Extra",
+		"Alchemology",
 		127, 36, 62,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,4,7,9,11,12,14,16,19,20,23,24,27,28,31,32,35,40,39,40,45,48,51,52,55,56],
@@ -1668,7 +1780,7 @@ cipherList = [
 
 	new cipher(
 		"Pythagorean Alchemology",
-		"Extra",
+		"Alchemology",
 		216, 75, 49,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,4,7,9,11,12,14,16,19,1,4,7,9,11,12,14,16,19,1,4,7,9,11,12,14,16],
@@ -1679,7 +1791,7 @@ cipherList = [
 
 	new cipher(
 		"Chaldean Alchemology",
-		"Extra",
+		"Alchemology",
 		127, 36, 62,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[1,4,7,9,11,16,7,11,1,1,4,7,9,11,14,16,1,4,7,9,12,12,12,11,1,14],
@@ -1690,7 +1802,7 @@ cipherList = [
 
 	new cipher(
 		"Prime Alchemology",
-		"Extra",
+		"Alchemology",
 		90, 78, 83,
 		[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122],
 		[4,7,11,14,4,9,16,1,11,4,9,1,11,14,4,16,11,14,9,16,1,14,4,16,14,4],
@@ -1714,7 +1826,7 @@ cipherList = [
 
 	new cipher(
 		"Hebrew Alchemology",
-		"Hebrew",
+		"Alchemology",
 		44, 62, 73,
 		[1488,1489,1490,1491,1492,1493,1494,1495,1496,1497,1499,1500,1502,1504,1505,1506,1508,1510,1511,1512,1513,1514,1498,1501,1503,1507,1509],
 		[1,4,7,9,11,12,14,16,19,20,23,24,27,28,31,32,35,40,39,40,45,48,23,27,28,35,40],
@@ -1759,7 +1871,7 @@ cipherList = [
 
 	new cipher(
 		"Ancient Greek Alchemology",
-		"Greek",
+		"Alchemology",
 		270, 93, 80,
 		[945,946,947,948,949,989,987,950,951,952,953,954,955,956,957,958,959,960,985,961,963,962,964,965,966,967,968,969,993],
 		[1,4,7,9,11,12,12,14,16,19,20,23,24,27,28,31,32,35,40,39,40,40,45,48,51,52,55,56,59],
@@ -1770,7 +1882,7 @@ cipherList = [
 
 	new cipher(
 		"Modern Greek Alchemology",
-		"Greek",
+		"Alchemology",
 		260, 82, 70,
 		[945,946,947,948,949,950,951,952,953,954,955,956,957,958,959,960,961,963,962,964,965,966,967,968,969],
 		[1,4,7,9,11,12,14,16,19,20,23,24,27,28,31,32,35,40,40,39,40,45,48,51,52],
@@ -1781,7 +1893,7 @@ cipherList = [
 
 	new cipher(
 		"Greek Proton Alchemology",
-		"Greek",
+		"Alchemology",
 		260, 82, 70,
 		[945,946,947,948,949,950,951,952,953,954,955,956,957,958,959,960,961,963,962,964,965,966,967,968,969],
 		[1,1,2,2,0,3,3,0,4,5,5,6,6,7,7,8,8,8,8,9,10,10,10,11,12],
@@ -1836,7 +1948,7 @@ cipherList = [
 
 	new cipher(
 		"Russian Alchemology",
-		"Languages",
+		"Alchemology",
 		50, 78, 63,
 		[1072,1073,1074,1075,1076,1077,1105,1078,1079,1080,1081,1082,1083,1084,1085,1086,1087,1088,1089,1090,1091,1092,1093,1094,1095,1096,1097,1098,1099,1100,1101,1102,1103],
 		[1,4,7,9,11,12,14,16,19,20,23,24,27,28,31,32,35,40,39,40,45,48,51,52,55,56,59,60,63,64,69,74,75],
@@ -1869,7 +1981,7 @@ cipherList = [
 
 	new cipher(
 		"Mars Kamea Gematria",
-		"Extra",
+		"Thelemic",
 		0, 70, 60,
 		[97,115,119,98,107,111,121,100,104,108,117,102,106,110,114,118,103,112,116,120,99,109,113,122,101,105],
 		[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25],
@@ -1999,10 +2111,19 @@ function normaliseCipherCategories() {
 // cipherList, so grouping the array by category is what actually controls the
 // tab order. Stable sort, so the order inside each category is untouched.
 // Anything not listed keeps its relative position at the end.
+// Three groups: the named "main branches" in the order given, then everything
+// else alphabetised, then the language group in the order given. See the
+// blank-gap markers in createCiphersMenu() (calc.js), which key off
+// "Alphanumeric" and "Languages" being the first entries of the second and
+// third groups here.
 var cipherCategoryOrder = [
-	"English", "Reverse", "Gematria", "CCRU", "Conspiracy",
-	"Cryptography", "Extra", "Maths", "Archaic", "Thelemic",
-	"Languages", "Latin", "Hebrew", "Greek"
+	"Base-4", "CCRU", "Gematria", "Reverse",
+
+	"Elizabethan", "Extra", "Illuminati", "Latin", "Maths", "Thelemic",
+
+	"Alphanumeric", "Alchemology", "Cryptography", "Experimental", "Polygonal",
+
+	"Languages", "Hebrew", "Greek"
 ]
 
 function orderCipherCategories() {
@@ -2019,7 +2140,7 @@ function orderCipherCategories() {
 // These categories are grab-bags with no meaningful structural order, so they
 // read better alphabetically. Runs after the grouping, so each one's slots are
 // contiguous.
-var alphabeticalCipherCategories = ["Languages", "Extra", "Maths", "Archaic", "Cryptography"]
+var alphabeticalCipherCategories = ["Languages", "Extra", "Experimental", "Maths", "Polygonal", "Elizabethan", "Cryptography", "Alphanumeric", "Alchemology"]
 
 function sortCipherCategoriesAlphabetically() {
 	alphabeticalCipherCategories.forEach(function (cat) {
@@ -2040,8 +2161,23 @@ function sortCipherCategoriesAlphabetically() {
 // Grouping by category is a stable sort, so a restored workspace keeps the
 // relative order it was saved with - which means arranging these in the file
 // alone would only ever be right for a first-time visitor.
+// Alphanumeric used to be pinned here too, leading with Alphanumeric Satanic
+// etc in a fixed order - removed now that it is one of the categories in
+// alphabeticalCipherCategories above, which a pin would otherwise override.
 var cipherPinnedOrder = [
-	{ category: "Gematria", names: ["Single Reduction", "KV Exception", "SKV Exception", "Capitals Added"] }
+	{ category: "Gematria", names: ["Single Reduction", "KV Exception", "SKV Exception", "Capitals Added"] },
+	// Standard moved into CCRU from Extra - pinned right after Synx rather than
+	// alphabetised, since CCRU is not in alphabeticalCipherCategories. Anything
+	// not named here (Numeric QWERTY, QWERTY) keeps its existing relative order.
+	// Based Atlanteanism last of the pinned four, directly after the two it is
+	// derived from (Standard minus Alphanumeric Qabbala, over 9) - reading the
+	// category top to bottom now goes parents, then child.
+	{ category: "CCRU", names: ["Alphanumeric Qabbala", "Synx", "Standard", "Based Atlanteanism", "Based Atlanteanism Denovated"] },
+	// Archaic Alphanumeric pinned to lead the category on request, even though
+	// true alphabetical order (which Alphanumeric otherwise follows, see
+	// alphabeticalCipherCategories above) would put it after the "Alphanumeric
+	// ..." names. Everything else keeps its alphabetised order.
+	{ category: "Alphanumeric", names: ["Archaic Alphanumeric"] }
 ]
 
 function pinCipherOrder() {
@@ -2094,7 +2230,11 @@ var builtinCipherArgs = cipherList.map(function (c) {
 	return [
 		c.cipherName, c.cipherCategory, c.H, c.S, c.L,
 		c.cArr.slice(), c.vArr.slice(),
-		c.diacriticsAsRegular, c.enabled, c.caseSensitive
+		c.diacriticsAsRegular, c.enabled, c.caseSensitive,
+		// carried through too, or a cipher re-added to a restored workspace
+		// comes back without its working shown - the values would be right
+		// and the breakdown box would quietly fall back to the letter grid
+		c.derivation
 	]
 })
 
@@ -2105,8 +2245,189 @@ var builtinCipherArgs = cipherList.map(function (c) {
 // The trade-off: a built-in the user deliberately deleted comes back on the
 // next load. That is the cost of ever being able to ship a new cipher, and
 // deleting it again is one click, so it lands on the recoverable side.
+// A cipher that shipped under one name and now ships under another.
+//
+// Renaming a built-in is normally invisible to anyone who has used the site
+// before: their stored blob still holds the old name, the merge below only
+// adds names it does not already have, and so the new definition never
+// arrives. Worse when the old name gets reused - "Based Atlanteanism" used to
+// be the divided cipher and is now the undivided one, so a returning member
+// ended up with their old 74 sitting under the new name and the real 666
+// nowhere, because the name was already taken.
+//
+// Renaming their copy frees the name, and the merge then adds the current
+// cipher normally. Their values, colour and enabled state are all kept - this
+// only changes what the thing is called.
+//
+// Deliberately narrow: it fires only when the stored letter values are
+// exactly the ones that shipped under the old name. A cipher the member built
+// or retuned themselves does not match, and is left alone.
+// The divided cipher's a..z values, which have never changed - only the name
+// on the front of them has. Used to recognise a stored copy whatever it is
+// currently called.
+var BASED_ATLANTEANISM_DIVIDED = [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,1,2,3,4,5,6,7,8,19,30,41,52,63,74,85]
+
+var cipherRenames = [
+	{ from: "Based Atlanteanism",         to: "Based Atlanteanism Denovated", letterValues: BASED_ATLANTEANISM_DIVIDED },
+	// briefly shipped as "Reduced" before the name settled on "Denovated";
+	// anyone who loaded the site in between has a copy of it saved
+	{ from: "Based Atlanteanism Reduced", to: "Based Atlanteanism Denovated", letterValues: BASED_ATLANTEANISM_DIVIDED }
+]
+
+// Colours a cipher has shipped with in the past.
+//
+// A stored workspace pins the colour it was saved with, and mergeBuiltinCiphers
+// below deliberately never overwrites one - members recolour ciphers on purpose
+// (Color Controls) and having that undone on the next load would be worse than
+// a stale colour. The cost is that a colour corrected after release never
+// reaches anyone who has used the site before.
+//
+// These two ciphers went through several colours while their naming settled,
+// so the ones below are listed explicitly: a stored cipher still wearing any
+// of them was never recoloured by hand and is safe to bring up to date. Pick
+// a colour of your own and it matches nothing here, so it stays.
+var cipherPastColours = {
+	"Based Atlanteanism":           [[165,48,58],[150,48,58],[196,100,54],[130,78,50],[162,62,56],[172,100,62]],
+	"Based Atlanteanism Denovated": [[165,48,58],[135,55,55],[130,78,50],[196,100,54],[172,100,62],[162,62,56],[156,80,62]]
+}
+
+// Re-attaches the shipped `derivation` to a stored cipher that is missing it.
+//
+// A saved workspace stores a cipher's characters, values, colour and flags -
+// never its derivation, which only exists in this file. mergeBuiltinCiphers
+// sets it when it ADDS a cipher, but a cipher already present by name is left
+// alone, so a member who saved their setup after one of these shipped ends up
+// with the right numbers and no working shown: the breakdown box quietly falls
+// back to the letter grid and the equation never appears again.
+//
+// Unlike a colour, this is not something a member can choose - there is no UI
+// for it - so adopting the shipped value cannot overwrite a decision. It is
+// still gated on the letter values matching, so it only ever attaches to the
+// cipher it actually describes. Nothing else about the stored cipher is
+// touched: characters and values stay exactly as saved, in case they were
+// extended by hand.
+function refreshShippedDerivations() {
+	if (typeof builtinCipherArgs === "undefined") return 0
+	var changed = 0
+	for (var i = 0; i < cipherList.length; i++) {
+		var c = cipherList[i]
+		var def = null
+		for (var d = 0; d < builtinCipherArgs.length; d++) {
+			if (builtinCipherArgs[d][0] === c.cipherName) { def = builtinCipherArgs[d]; break }
+		}
+		if (def === null || def[10] === undefined || def[10] === null) continue
+		if (c.derivation) continue // already has one
+
+		var mine = cipherLetterValues(c)
+		var theirs = cipherLetterValues({ cArr: def[5], vArr: def[6] })
+		if (mine === null || theirs === null) continue
+		if (mine.join(",") !== theirs.join(",")) continue
+
+		c.derivation = def[10]
+		changed++
+	}
+	return changed
+}
+
+function refreshShippedColours() {
+	if (typeof builtinCipherArgs === "undefined") return 0
+	var changed = 0
+	for (var i = 0; i < cipherList.length; i++) {
+		var c = cipherList[i]
+		var past = cipherPastColours[c.cipherName]
+		if (past === undefined) continue
+
+		var def = null
+		for (var d = 0; d < builtinCipherArgs.length; d++) {
+			if (builtinCipherArgs[d][0] === c.cipherName) { def = builtinCipherArgs[d]; break }
+		}
+		if (def === null) continue
+		if (c.H === def[2] && c.S === def[3] && c.L === def[4]) continue // already current
+
+		var untouched = false
+		for (var p = 0; p < past.length; p++) {
+			if (c.H === past[p][0] && c.S === past[p][1] && c.L === past[p][2]) { untouched = true; break }
+		}
+		if (!untouched) continue // a colour the member chose - leave it
+
+		c.H = def[2]; c.S = def[3]; c.L = def[4]
+		changed++
+	}
+	return changed
+}
+
+// a..z values in order, ignoring any other characters the table may carry
+// (digits were added to these ciphers later, so a stored copy may predate them)
+function cipherLetterValues(c) {
+	var out = []
+	for (var code = 97; code <= 122; code++) {
+		var at = c.cArr.indexOf(code)
+		if (at === -1) return null
+		out.push(c.vArr[at])
+	}
+	return out
+}
+
+function applyCipherRenames() {
+	var renamed = 0
+	for (var r = 0; r < cipherRenames.length; r++) {
+		var rule = cipherRenames[r]
+		for (var i = 0; i < cipherList.length; i++) {
+			var c = cipherList[i]
+			if (c.cipherName !== rule.from) continue
+			var vals = cipherLetterValues(c)
+			if (vals === null || vals.join(",") !== rule.letterValues.join(",")) continue
+			// Already a copy under the new name? Then this one is a leftover
+			// of the same cipher under a name that is no longer shipped, and
+			// keeping it would leave the member with the thing listed twice.
+			// Safe to drop precisely because the values matched: it is not
+			// something they built, it is our cipher wearing an old label.
+			var taken = false
+			for (var k = 0; k < cipherList.length; k++) {
+				if (k !== i && cipherList[k].cipherName === rule.to) taken = true
+			}
+			if (taken) {
+				cipherList.splice(i, 1)
+				renamed++
+				break
+			}
+			c.cipherName = rule.to
+
+			// The letter values matching exactly is proof this is the shipped
+			// cipher under its old name, so bring the rest of it up to date
+			// too: digits (added later, and 0 rather than absent - see the
+			// cipher's own note) and the derivation that draws the working.
+			// Colour and enabled state stay as the member left them; only the
+			// parts that define what the cipher IS are refreshed.
+			if (typeof builtinCipherArgs !== "undefined") {
+				for (var d = 0; d < builtinCipherArgs.length; d++) {
+					var def = builtinCipherArgs[d]
+					if (def[0] !== rule.to) continue
+					c.cArr = def[5].slice()
+					c.vArr = def[6].slice()
+					c.derivation = def[10]
+					break
+				}
+			}
+
+			renamed++
+			break
+		}
+	}
+	return renamed
+}
+
 function mergeBuiltinCiphers() {
 	if (typeof builtinCipherArgs === "undefined") return 0
+
+	// before anything is matched by name, settle any names that moved
+	applyCipherRenames()
+	// ...then bring a stale shipped colour up to date, where it is clear the
+	// member never picked one themselves
+	refreshShippedColours()
+	// ...and re-attach the working shown under a derived cipher, which a
+	// stored workspace never carries
+	refreshShippedDerivations()
 
 	var byName = {}
 	for (var b = 0; b < builtinCipherArgs.length; b++) byName[builtinCipherArgs[b][0]] = builtinCipherArgs[b]
@@ -2133,7 +2454,7 @@ function mergeBuiltinCiphers() {
 	for (var j = 0; j < builtinCipherArgs.length; j++) {
 		var a = builtinCipherArgs[j]
 		if (have[a[0]]) continue
-		cipherList.push(new cipher(a[0], a[1], a[2], a[3], a[4], a[5].slice(), a[6].slice(), a[7], a[8], a[9]))
+		cipherList.push(new cipher(a[0], a[1], a[2], a[3], a[4], a[5].slice(), a[6].slice(), a[7], a[8], a[9], a[10]))
 		added++
 	}
 	return added

@@ -18,6 +18,10 @@ $(document).ready(function(){
 	});
 	$("body").on("click", ".phraseGemCiphName", function () {
 		updateWordBreakdown($(this).text(), true);
+		// A deliberate click on a cipher is what sets the rain to that cipher's
+		// colour - here, and not in updateWordBreakdown(), which also runs for
+		// automatic re-selections (see the note there in breakdown.js).
+		if (typeof coderainSetFollow === "function") coderainSetFollow(true);
 	});
 });
 
@@ -282,40 +286,71 @@ function loadFile(filePath) {
 	return result;
   }
 
+// Same as loadFile(), but non-blocking. The synchronous XHR above freezes the
+// whole tab - no paint, no input, nothing - for as long as the request takes,
+// which for the multi-megabyte word database is the single biggest hit to
+// perceived load time. This fetches the same way but hands the text to a
+// callback once it arrives instead of stalling the main thread to return it.
+function loadFileAsync(filePath, callback) {
+	fetch(filePath).then(function (res) {
+		return res.ok ? res.text() : null
+	}).then(function (text) {
+		callback(text)
+	}).catch(function () {
+		callback(null)
+	})
+}
+
 $(document).ready(function(){
 
 	$("body").on("click", "#btn-print-cipher-png", function () { // for future elements
 		// English-Ordinal_cipher.png
 		var fileName = breakCipher.replace(/ /g, "-")+"_cipher.png";
-		openImageWindow("#ChartSpot", fileName, 2.0);
+		openImageWindow("#ChartSpot", fileName, exportImageScale());
 	});
 
 	$("body").on("click", "#btn-print-history-png", function () {
+		if (!sHistory.length) { displayCalcNotification("The history table is empty", 2000); return }
 		// phrase-with-spaces_2021-03-26_10-23-52_table.png
 		var fileName = sHistory[0].normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/ /g, "-").replace(/["|']/g, "")+
 			"_"+getTimestamp()+"_table.png";
-		openImageWindow(".HistoryTable", fileName, 2.0);
+		openImageWindow(".HistoryTable", fileName, exportImageScale());
 	});
+	// The chart is a canvas, so it is read straight off rather than put through
+	// html2canvas: the pixels are already there, and re-rasterising a canvas
+	// only costs sharpness. The 3D view exports whatever angle it is turned to.
+	$("body").on("click", "#btn-astro-chart-png", function () {
+		var cvs = document.getElementById("astroCanvas")
+		if (cvs === null) { displayCalcNotification("Open the Astrology tab first", 2200); return }
+		var d = [$("#astroY").val(), $("#astroM").val(), $("#astroD").val()].join("-")
+		var fileName = d + "_" + (astroViewMode === "3d" ? "3d" : "2d") + "_astrology_chart.png"
+		printCanvasImage(cvs, fileName, "btn-astro-chart-png")
+	});
+
 	$("body").on("click", "#btn-date-calc-png", function () {
+		if (!dateCalcMenuOpened) { displayCalcNotification("Open the Date Calc first", 2200); return }
 		$('#dateDesc1Area').html('<span class="dateDescription">'+dateDesc1Saved+'</span>') // input to fixed text
 		$('#dateDesc2Area').html('<span class="dateDescription">'+dateDesc2Saved+'</span>')
 		$('.dateCalcTable2').addClass('elemBorderScr') // add outline
 		// phrase-with-spaces_2021-03-26_10-23-52_table.png
 		var fileName = (saved_d1.getMonth()+1)+'-'+saved_d1.getDate()+'-'+saved_d1.getFullYear()+'_'+
 			(saved_d2.getMonth()+1)+'-'+saved_d2.getDate()+'-'+saved_d2.getFullYear()+"_date_durations.png";
-		openImageWindow(".dateCalcTable2", fileName, 2.0);
+		openImageWindow(".dateCalcTable2", fileName, exportImageScale());
 	});
 
 	$("body").on("click", "#btn-print-word-break-png", function () {
+		if (!sVal()) { displayCalcNotification("Enter a phrase first", 2000); return }
 		// phrase-with-spaces_English-Ordinal_190_breakdown.png
 		for (var i = 0; i < cipherList.length; i++) { if (cipherList[i].cipherName == breakCipher) break; } // get current cipher index
+		if (i >= cipherList.length) { displayCalcNotification("Choose a cipher first", 2000); return }
 		var fileName = sVal().normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/ /g, "-").replace(/["|']/g, "")+
 			"_"+breakCipher.replace(/ /g, "-")+"_"+cipherList[i].calcGematria(sVal())+"_breakdown.png";
 		prepBreakdownExport() // add phrase/cipher/total header, raise contrast
-		openImageWindow("#BreakdownSpot", fileName, 2.0);
+		openImageWindow("#BreakdownSpot", fileName, exportImageScale());
 	});
 
 	$("body").on("click", "#btn-print-breakdown-details-png", function () {
+		if (!sVal()) { displayCalcNotification("Enter a phrase first", 2000); return }
 		var o = $(".LetterCounts").text();
 		var i, c_h, c_s, c_l = 0;
 		for (i = 0; i < cipherList.length; i++) {
@@ -329,6 +364,7 @@ $(document).ready(function(){
 		// $(".LetterCounts").html('<span style="color: hsl('+c_h+' '+c_s+'% '+c_l+'% / 1); font-weight: 500; font-size: 200%;">Gematria</span><br><hr style="background-color: rgb(105,105,105); height: 2px; border: none;">');
 		//$("#BreakdownDetails").attr("style", "padding-top: 1.25em;"); // more padding
 		// $(".LetterCounts").html('<br><hr style="background-color: rgb(105,105,105); height: 2px; border: none;">');
+		if (i >= cipherList.length) { displayCalcNotification("Choose a cipher first", 2000); return }
 		$(".LetterCounts").html('');
 		updateCipherChartGemCard(); // redraw cipher chart for current cipher (with borders)
 		$('#ChartSpotScroll').addClass('ChartSpotScrollStop'); // full size chart table for mobile devices
@@ -339,12 +375,14 @@ $(document).ready(function(){
 		// phrase-with-spaces_English-Ordinal_190_card.png
 		var fileName = sVal().normalize('NFD').replace(/[\u0300-\u036f]/g, "").replace(/ /g, "-").replace(/["|']/g, "")+
 			"_"+breakCipher.replace(/ /g, "-")+"_"+cipherList[i].calcGematria(sVal())+"_card.png";
-		openImageWindow("#BreakdownDetails", fileName, 2.0);
+		openImageWindow("#BreakdownDetails", fileName, exportImageScale());
 	});
 
 	$("body").on("click", "#btn-num-props-png", function () {
 		// 123_number_properties.png OR 123_alt_number_properties.png
-		var curNum = document.querySelector('.numPropTooltip').dataset.number // current number
+		var tip = document.querySelector('.numPropTooltip')
+		if (tip === null) { displayCalcNotification("Click a number first to open its properties", 2500); return }
+		var curNum = tip.dataset.number // current number
 		var fileName = curNum+"_number_properties.png";
 		openImageWindow(".numPropTooltip", fileName, optImageScale);
 	});
@@ -365,7 +403,7 @@ $(document).ready(function(){
 		exportHighlighterMatches(sHistory);
 	});
 	$("body").on("click", "#btn-export-db-query", function () {
-		exportCurrentDBquery(queryResult);
+		exportCurrentDBquery(typeof queryResult !== "undefined" ? queryResult : []);
 	});
 	$("body").on("change", "#importFileDummyDict", function () {
 		var file = document.querySelector("#importFileDummyDict").files[0];
@@ -394,9 +432,16 @@ var ctrlIsPressed = false; // allow Ctrl modifier key
 var shiftIsPressed = false; // allow Shift modifier key
 
 // used inside highlighter.js
-var avail_match = []; // all matches found with auto highligher
+var avail_match = []; // all matches found with auto highligher, flattened across every enabled cipher (Highlight box display only - see avail_match_by_col)
 var avail_match_freq = []; // frequency of matches found with auto highligher
 var freq = []; // frequency of matches found with auto highlighter (combined)
+// Same Cipher Match only: avail_match_by_col[cipher column index] = {value: true, ...}
+// for values that genuinely repeat within that column. avail_match above
+// loses which cipher a match came from once flattened, which let a value
+// with a real match in one cipher "match" an unrelated lone occurrence of
+// the same number in a different cipher - this is what buildHistMatchOrder()
+// and the Same Cipher Match highlighting actually key off instead.
+var avail_match_by_col = [];
 
 var prevPhrID = -1 // index of previously selected phrase in history table
 var prevCiphIndex = -1 // index of previously selected cipher in enabled ciphers table
@@ -480,9 +525,12 @@ $(document).ready(function(){
 		}
 	});
 	
-	// breakdown or cipher table letter/number clicked
-	$("body").on("click", ".ChartVal, .BreakChar, .BreakVal, .BreakValDark, .BreakWordSum", function () {
-		$(this).toggleClass('highlightCipherTable'); 
+	// cipher chart letter/number clicked (the Word Breakdown's own letters,
+	// values and word sums are handled directly by breakdownBoxClick() -
+	// breakdown.js - since #BreakTableContainer has its own onclick that
+	// rebuilds the box, which would otherwise race this delegated handler)
+	$("body").on("click", ".ChartVal", function () {
+		$(this).toggleClass('highlightCipherTable');
 	});
 	// cipher chart letter click (keyboard)
 	$("body").on("click", ".ChartChar", function () { // letters
@@ -515,7 +563,11 @@ $(document).ready(function(){
 
 	// history table value clicked (right mouse button)
 	// disable context menu for the element so right click works
-	$(".tC").live('contextmenu', function() { // ".bind" for existing elements, ".live" for future
+	// Delegated from document, which is what .live() did internally before it
+	// was removed in jQuery 1.9. The rows of the history table are rebuilt on
+	// every calculation, so the handler has to survive elements that do not
+	// exist yet — that is the whole reason .live() was used here.
+	$(document).on('contextmenu', '.tC', function() {
 		$(this).find(".gV").toggleClass('hideValue'); // <b> "style="display: none;"
 		return false; // don't show menu
 	})
@@ -531,7 +583,8 @@ $(document).ready(function(){
 			$( "table.HistoryTable td.tC > span:contains('"+val+"')" ).toggleClass('highlightValueBlink'); // add blinking effect
 		}
 	});
-	
+
+
 	// Right click on cipher name in enabled cipher table
 	$("body").on("contextmenu", ".phraseGemCiphName", function (e) { // tC - history table cell
 		var val = $(this).text(); // get cipher name from element
@@ -563,8 +616,7 @@ $(document).ready(function(){
 					createCiphersMenu() // recreate menus
 					createOptionsMenu()
 					createFindMatchesMenu()
-					createDateCalcMenu()
-					createAstrologyMenu()
+					createFeaturesMenu()
 					createExportMenu()
 					createAboutMenu()
 					createProfileMenu()

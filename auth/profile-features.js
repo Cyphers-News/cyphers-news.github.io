@@ -102,10 +102,14 @@ function phraseAlreadyPublished(phrase) {
 	if (client === null) return Promise.resolve(null)
 	var needle = String(phrase || "").trim()
 	if (needle === "") return Promise.resolve(null)
+	// A literal % or _ in the phrase itself is a real SQL LIKE wildcard to
+	// ILIKE - escaped so "50% off" only ever matches "50% off", not
+	// "50X off" for any X. Same fix as entriesSearch just above.
+	var safeNeedle = needle.replace(/[%_\\]/g, function (c) { return "\\" + c })
 
 	return client.from("phrase_submissions")
 		.select("id,user_id,phrase")
-		.ilike("phrase", needle)   // ILIKE with no wildcards is a case-insensitive equality test
+		.ilike("phrase", safeNeedle)   // ILIKE with no wildcards is a case-insensitive equality test
 		.limit(1)
 		.then(function (res) {
 			if (res.error) return null
@@ -208,12 +212,51 @@ function submissionsFor(phrases) {
 
 // ---- leaderboard ------------------------------------------------------
 
-// Reads the leaderboard view, which exposes display name, avatar and counts
-// and never touches email.
+// leaderboard used to be a plain view; it is now the leaderboard_top() RPC
+// (20260820020000_security_definer_view_fix.sql) so this schema has no
+// security-definer view left reachable via the API. Same columns either way -
+// display name, avatar and counts, never email.
 function leaderboardTop(limit) {
 	var client = getAuthClient()
 	if (client === null || authUser === null) return Promise.resolve([])
-	return client.from("leaderboard").select("*").limit(limit || 25)
+	return client.rpc("leaderboard_top", { lim: limit || 25 })
+		.then(function (res) {
+			if (res.error) throw res.error
+			return res.data || []
+		})
+}
+
+// Top phrases site-wide by reaction count, not grouped by contributor - the
+// cross-user aggregation happens in the RPC itself (trending_phrases), since
+// pulling every submission down to sort client-side would not scale.
+function trendingPhrases(limit) {
+	var client = getAuthClient()
+	if (client === null || authUser === null) return Promise.resolve([])
+	return client.rpc("trending_phrases", { lim: limit || 30 }).then(function (res) {
+		if (res.error) throw res.error
+		return res.data || []
+	})
+}
+
+// Leaders' New tab - every submission across every contributor, newest
+// first, reaction or not.
+function newestPhrases(limit) {
+	var client = getAuthClient()
+	if (client === null || authUser === null) return Promise.resolve([])
+	return client.rpc("newest_phrases", { lim: limit || 40 }).then(function (res) {
+		if (res.error) throw res.error
+		return res.data || []
+	})
+}
+
+// Leaders' Trending / Most Loved / Funniest tabs - one reaction type at a
+// time (type is "heart", "like" or "laugh", shown to members as Evergreen,
+// Trending, Funny), ordered either by the most recent reaction of that type
+// ("recent") or by how many it has in total ("top").
+function phrasesByReaction(type, order, limit) {
+	var client = getAuthClient()
+	if (client === null || authUser === null) return Promise.resolve([])
+	return client.rpc("phrases_by_reaction", { reaction_type: type, order_mode: order || "recent", lim: limit || 30 })
 		.then(function (res) {
 			if (res.error) throw res.error
 			return res.data || []
@@ -221,12 +264,13 @@ function leaderboardTop(limit) {
 }
 
 // A contributor's published phrases. Only ever returns submitted rows, so a
-// private history entry can never appear here.
+// private history entry can never appear here. id is needed for reactions -
+// without it there is nothing to react to a row by.
 function leaderboardPhrases(userId, limit) {
 	var client = getAuthClient()
 	if (client === null || authUser === null) return Promise.resolve([])
 	return client.from("phrase_submissions")
-		.select("phrase, cipher, value, created_at")
+		.select("id, phrase, cipher, value, created_at")
 		.eq("user_id", userId)
 		.order("created_at", { ascending: false })
 		.limit(limit || 50)
@@ -235,6 +279,119 @@ function leaderboardPhrases(userId, limit) {
 			return res.data || []
 		})
 }
+
+// ---- reactions ----------------------------------------------------------
+//
+// Four independent reactions (heart = Loved, like = Trending News,
+// laugh = Funny, ccru = CCRU) - a member may hold any subset of them on the
+// same phrase at once (20260820040000_ccru_and_notifications.sql widened the
+// table's unique key from (submission, member) to (submission, member,
+// reaction) for exactly this). Setting one is an upsert on that three-part
+// key rather than a delete-then-insert, so a slow connection can never leave
+// a phrase with two rows for the same reaction or briefly none at all.
+// Unsetting one deletes only that reaction's own row - the other three, if
+// held, are untouched.
+
+function phraseReact(submissionId, reactionType) {
+	var client = getAuthClient()
+	if (client === null || authUser === null) return Promise.reject(new Error("Not signed in"))
+	return client.from("phrase_reactions")
+		.upsert(
+			{ submission_id: submissionId, user_id: authUser.id, reaction: reactionType },
+			{ onConflict: "submission_id,user_id,reaction" }
+		)
+		.then(function (res) { if (res.error) throw res.error; return true })
+}
+
+function phraseUnreact(submissionId, reactionType) {
+	var client = getAuthClient()
+	if (client === null || authUser === null) return Promise.reject(new Error("Not signed in"))
+	return client.from("phrase_reactions").delete()
+		.eq("submission_id", submissionId).eq("user_id", authUser.id).eq("reaction", reactionType)
+		.then(function (res) { if (res.error) throw res.error; return true })
+}
+
+// Batch counts for a list of phrases, keyed by submission id - a contributor's
+// list can be hundreds of phrases long, and a request per row would be a
+// request storm. Ids with no reactions at all are simply absent from the
+// result; the caller treats a missing id as all-zero/none-mine.
+function phraseReactionCounts(ids) {
+	var client = getAuthClient()
+	if (client === null || authUser === null || !ids.length) return Promise.resolve({})
+	return client.rpc("phrase_reaction_counts", { target_ids: ids }).then(function (res) {
+		if (res.error) throw res.error
+		var map = {}
+		;(res.data || []).forEach(function (r) {
+			map[r.submission_id] = {
+				heart: r.heart_count, like: r.like_count, laugh: r.laugh_count, ccru: r.ccru_count,
+				mine: { heart: !!r.heart_mine, like: !!r.like_mine, laugh: !!r.laugh_mine, ccru: !!r.ccru_mine }
+			}
+		})
+		return map
+	})
+}
+
+// ---- phrase-reaction notifications ---------------------------------------
+//
+// "Someone reacted to a phrase you published." One row per (recipient,
+// actor, phrase, reaction) - see the migration above for why removing a
+// reaction never creates one of these, and re-adding the same one just
+// resurfaces the existing row as unread instead of duplicating it.
+
+function phraseNotifUnreadCount() {
+	var client = getAuthClient()
+	if (client === null || authUser === null) return Promise.resolve(0)
+	return client.rpc("phrase_notif_unread_count").then(function (res) {
+		if (res.error) throw res.error
+		return res.data || 0
+	})
+}
+
+function phraseNotificationsList(limit) {
+	var client = getAuthClient()
+	if (client === null || authUser === null) return Promise.resolve([])
+	return client.rpc("phrase_notifications_list", { lim: limit || 30 }).then(function (res) {
+		if (res.error) throw res.error
+		return res.data || []
+	})
+}
+
+function phraseNotifMarkRead(id) {
+	var client = getAuthClient()
+	if (client === null || authUser === null) return Promise.reject(new Error("Not signed in"))
+	return client.rpc("phrase_notif_mark_read", { target: id }).then(function (res) {
+		if (res.error) throw res.error
+		return true
+	})
+}
+
+function phraseNotifMarkAllRead() {
+	var client = getAuthClient()
+	if (client === null || authUser === null) return Promise.reject(new Error("Not signed in"))
+	return client.rpc("phrase_notif_mark_all_read").then(function (res) {
+		if (res.error) throw res.error
+		return true
+	})
+}
+
+// Cached the same way chatUnreadCache is (auth/chat.js) - frNewsCounts
+// (calc/friends-tab.js) reads phraseNotifCache.n directly, same as it reads
+// chatUnreadCache.n, so the Social badge counts phrase-reaction
+// notifications, friend requests and unread chats without fetching any of
+// them twice.
+var phraseNotifCache = { at: 0, n: 0 }
+var PHRASE_NOTIF_TTL = 15000
+
+function phraseNotifCountCached(force) {
+	var now = Date.now()
+	if (!force && (now - phraseNotifCache.at) < PHRASE_NOTIF_TTL) return Promise.resolve(phraseNotifCache.n)
+	return phraseNotifUnreadCount().then(function (n) {
+		phraseNotifCache = { at: Date.now(), n: Number(n) || 0 }
+		return phraseNotifCache.n
+	}).catch(function () { return phraseNotifCache.n })
+}
+
+function phraseNotifInvalidate() { phraseNotifCache = { at: 0, n: 0 } }
 
 // ---- avatar upload ----------------------------------------------------
 

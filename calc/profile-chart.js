@@ -11,44 +11,14 @@
 // inputs and there is nothing to keep in step.
 
 // ---- zodiac ------------------------------------------------------------
-
-// Lahiri, the standard Indian ayanamsa: 23°51'11" at J2000, drifting about
-// 50.28 arcseconds a year.
-function astroAyanamsa(d) {
-	return 23.8531 + (d / 365.25) * 0.0139659
-}
-
-// Shifts a whole chart into the sidereal zodiac. Longitudes move, the
-// relationships between them do not, so aspects are left exactly as they were.
-function astroToSidereal(chart) {
-	var ayan = astroAyanamsa(chart.d)
-	var out = {
-		d: chart.d, ayanamsa: ayan, phase: chart.phase,
-		plutoOutOfRange: chart.plutoOutOfRange,
-		bodies: [], aspects: chart.aspects, sidereal: true
-	}
-	for (var i = 0; i < chart.bodies.length; i++) {
-		var b = chart.bodies[i]
-		var lon = aRev(b.lon - ayan)
-		var s = astroSignOf(lon)
-		out.bodies.push({
-			key: b.key, name: b.name, glyph: b.glyph, lon: lon,
-			sign: s.sign, signIdx: s.idx, deg: s.deg, min: s.min,
-			retro: b.retro, speed: b.speed, house: b.house
-		})
-	}
-	if (chart.houses) {
-		out.houses = { system: chart.houses.system, cusps: [] }
-		for (var h = 0; h < chart.houses.cusps.length; h++) {
-			out.houses.cusps.push(aRev(chart.houses.cusps[h] - ayan))
-		}
-		out.houses.asc = aRev(chart.houses.asc - ayan)
-		out.houses.mc = aRev(chart.houses.mc - ayan)
-		out.ascSign = astroSignOf(out.houses.asc)
-		out.mcSign = astroSignOf(out.houses.mc)
-	}
-	return out
-}
+//
+// astroAyanamsa() (Lahiri) and astroToSidereal() live in calc/astrology.js,
+// with the rest of the zodiac machinery, rather than in a second copy here.
+// A sidereal chart on this tab is built sidereal from the start - the zodiac
+// is passed into astroChart - so its Ascendant, cusps and house numbers all
+// belong to the same zodiac. Taking the ayanamsa off a finished tropical
+// chart, as this used to, left Whole Sign cusps mid-sign and every planet
+// carrying its tropical house number.
 
 // ---- tab state ---------------------------------------------------------
 
@@ -63,7 +33,6 @@ function pcDefaultForm() {
 		y: now.getFullYear() - 30, m: 1, d: 1,
 		hh: 12, mm: 0,
 		timeKnown: true,
-		usePlace: true,
 		place: "", lat: 51.5074, lon: -0.1278, tz: 0
 	}
 }
@@ -91,8 +60,15 @@ function pcCapture() {
 
 function pcSetZodiac(z) { pcCapture(); pcZodiac = z; renderProfileChart() }
 function pcToggleTime() { pcCapture(); pcForm.timeKnown = !pcForm.timeKnown; renderProfileChart() }
-function pcTogglePlace() { pcCapture(); pcForm.usePlace = !pcForm.usePlace; renderProfileChart() }
 function pcRedraw() { pcCapture(); pcDraw() }
+
+// pcField puts its own oninput last, and a duplicate attribute is ignored, so
+// this one has to redraw as well as clear the flag.
+function pcTzEdited() {
+	pcTzGuessed = false
+	$(".pcTzNote").remove() // they have taken charge of it; stop second-guessing
+	pcRedraw()
+}
 
 // ---- computing ---------------------------------------------------------
 
@@ -102,10 +78,12 @@ function pcRedraw() { pcCapture(); pcDraw() }
 function pcBuildChart(f, zodiac) {
 	var hh = f.timeKnown ? f.hh : 12
 	var mm = f.timeKnown ? f.mm : 0
-	var ut = hh + mm / 60 - (f.usePlace ? f.tz : 0)
-	var loc = (f.usePlace && f.timeKnown) ? { lat: f.lat, lon: f.lon, system: "whole" } : null
-	var chart = astroChart(f.y, f.m, f.d, ut, loc)
-	return (zodiac === "sidereal") ? astroToSidereal(chart) : chart
+	var ut = hh + mm / 60 - f.tz
+	var sid = (zodiac === "sidereal")
+	var loc = f.timeKnown
+		? { lat: f.lat, lon: f.lon, system: "whole", zodiac: zodiac, ayanamsa: sid ? "lahiri" : null }
+		: (sid ? { zodiac: "sidereal", ayanamsa: "lahiri" } : null)
+	return astroChart(f.y, f.m, f.d, ut, loc)
 }
 
 // Today's sky against the birth chart. Only the slower bodies are worth
@@ -116,8 +94,9 @@ var pcTransitBodies = ["jupiter", "saturn", "uranus", "neptune", "pluto", "mars"
 function pcTransits(natal, zodiac) {
 	var now = new Date()
 	var ut = now.getUTCHours() + now.getUTCMinutes() / 60
-	var sky = astroChart(now.getUTCFullYear(), now.getUTCMonth() + 1, now.getUTCDate(), ut, null)
-	if (zodiac === "sidereal") sky = astroToSidereal(sky)
+	// built in the reading's own zodiac, rather than converted afterwards
+	var frame = (zodiac === "sidereal") ? { zodiac: "sidereal", ayanamsa: "lahiri" } : null
+	var sky = astroChart(now.getUTCFullYear(), now.getUTCMonth() + 1, now.getUTCDate(), ut, frame)
 
 	var hits = []
 	for (var i = 0; i < sky.bodies.length; i++) {
@@ -151,58 +130,19 @@ function renderProfileChart() {
 		var f = pcForm
 		var o = ''
 
-		o += '<div class="pcZodiacRow">'
-		o += '<button class="intBtn3 pcZodBtn' + (pcZodiac === "tropical" ? " pcZodOn" : "") + '" onclick="pcSetZodiac(&quot;tropical&quot;)">&#9711; Tropical</button>'
-		o += '<button class="intBtn3 pcZodBtn' + (pcZodiac === "sidereal" ? " pcZodOn" : "") + '" onclick="pcSetZodiac(&quot;sidereal&quot;)">&#9633; Sidereal</button>'
-		o += '<span class="profileWhen">' + (pcZodiac === "tropical" ? "Western, drawn as a wheel" : "Vedic (Lahiri), drawn as a square") + '</span>'
-		o += '</div>'
-
-		o += '<div class="pcFields">'
-		o += '<div class="pcRow"><label class="pcLab">Born</label>'
-		o += '<input type="number" id="pcY" class="pcIn pcInY" value="' + f.y + '" oninput="pcRedraw()" title="Year">'
-		o += '<input type="number" id="pcM" class="pcIn" min="1" max="12" value="' + f.m + '" oninput="pcRedraw()" title="Month">'
-		o += '<input type="number" id="pcD" class="pcIn" min="1" max="31" value="' + f.d + '" oninput="pcRedraw()" title="Day">'
-		o += '</div>'
-
-		o += '<div class="pcRow"><label class="pcLab">Time</label>'
-		if (f.timeKnown) {
-			o += '<input type="number" id="pcHH" class="pcIn" min="0" max="23" value="' + f.hh + '" oninput="pcRedraw()" title="Hour">'
-			o += '<input type="number" id="pcMM" class="pcIn" min="0" max="59" value="' + f.mm + '" oninput="pcRedraw()" title="Minute">'
-		} else {
-			o += '<span class="profileWhen pcUnknown">Unknown &mdash; using noon, no houses</span>'
-		}
-		o += '<label class="pcChk"><input type="checkbox"' + (f.timeKnown ? '' : ' checked') + ' onchange="pcToggleTime()"> I don\'t know my birth time</label>'
-		o += '</div>'
-
-		o += '<div class="pcRow"><label class="pcLab">Place</label>'
-		o += '<label class="pcChk"><input type="checkbox"' + (f.usePlace ? ' checked' : '') + ' onchange="pcTogglePlace()"> Use a birthplace</label>'
-		o += '</div>'
-
-		if (f.usePlace) {
-			o += '<div class="pcRow"><label class="pcLab"></label>'
-			o += '<input type="text" id="pcPlace" class="pcIn pcInPlace" value="' + authEsc(f.place) + '" placeholder="e.g. Brooklyn, New York" oninput="pcRedraw()">'
-			o += '<button class="profileMiniBtn" onclick="pcLookupPlace()">Find</button>'
-			o += '</div>'
-			o += '<div id="pcGeo" class="pcGeo"></div>'
-			o += '<div class="pcRow"><label class="pcLab">Lat / Lon</label>'
-			o += '<input type="number" step="0.0001" id="pcLat" class="pcIn" value="' + f.lat + '" oninput="pcRedraw()" title="Degrees north">'
-			o += '<input type="number" step="0.0001" id="pcLon" class="pcIn" value="' + f.lon + '" oninput="pcRedraw()" title="Degrees east">'
-			o += '<input type="number" step="0.25" id="pcTZ" class="pcIn" value="' + f.tz + '" oninput="pcRedraw()" title="Hours ahead of UTC at birth">'
-			o += '</div>'
-		}
-		o += '</div>'
-
-		o += '<div class="pcCanvasWrap"><canvas id="pcCanvas"></canvas></div>'
-		o += '<div id="pcPlanets"></div>'
-		o += '<div id="pcTransits"></div>'
-
-		o += '<div class="profileSearchRow">'
+		// Save first: naming and keeping the chart is the reason for this tab,
+		// so it should not be at the bottom past everything else.
+		o += '<div class="profileSearchRow pcSaveRow">'
 		o += '<input type="text" id="pcName" class="profileSearchInput" maxlength="60" placeholder="Whose chart is this?" value="' + authEsc(f.name) + '">'
-		o += '<button class="profileMiniBtn" onclick="pcSave()">' + (pcEditingId ? "Update" : "Save chart") + '</button>'
+		o += '<button class="profileMiniBtn pcSaveBtn" onclick="pcSave()">' + (pcEditingId ? "Update chart" : "Save chart") + '</button>'
 		if (pcEditingId) o += '<button class="profileMiniBtn" onclick="pcNew()">New</button>'
 		o += '</div>'
 
+		// The list of answers to "Whose chart is this?", so it sits with that
+		// question rather than at the very bottom past the wheel and the
+		// transits - which is where you had to scroll to reopen a chart.
 		if (rows.length) {
+			o += '<div class="pcSectionTitle">Saved charts</div>'
 			o += '<div class="profileList">'
 			rows.forEach(function (r) {
 				var nm = authEsc(r.name).replace(/"/g, '&quot;')
@@ -210,17 +150,103 @@ function renderProfileChart() {
 				o += '<span class="profileRowPhrase" onclick="pcOpen(&quot;' + r.id + '&quot;)">' + authEsc(r.name) + '</span>'
 				o += '<span class="profileRowActions">'
 				o += '<span class="profileWhen">' + authEsc(r.birth_date) + (r.time_known === false ? ' (no time)' : '') + '</span>'
-				o += '<span class="profileBadge">' + authEsc(r.zodiac || "tropical") + '</span>'
 				o += '<button class="profileMiniBtn" onclick="pcOpen(&quot;' + r.id + '&quot;)">Open</button>'
-				o += '<button class="profileMiniBtn profileMiniDanger" onclick="pcDelete(&quot;' + r.id + '&quot;,&quot;' + nm + '&quot;)">&#215;</button>'
+				o += '<button class="profileMiniBtn profileMiniDanger" onclick="pcDelete(this,&quot;' + r.id + '&quot;)">&#215;</button>'
 				o += '</span></div>'
 			})
 			o += '</div>'
 		}
 
+		// One row: what you are reading on the left, what you are saving on the
+		// right. The print group is pushed over with margin-left:auto rather
+		// than a spacer, so it stays right-aligned as the row wraps on mobile.
+		o += '<div class="pcZodiacRow">'
+		o += '<button class="intBtn3 pcZodBtn' + (pcZodiac === "tropical" ? " pcZodOn" : "") + '" onclick="pcSetZodiac(&quot;tropical&quot;)">&#9711; Tropical</button>'
+		o += '<button class="intBtn3 pcZodBtn' + (pcZodiac === "sidereal" ? " pcZodOn" : "") + '" onclick="pcSetZodiac(&quot;sidereal&quot;)">&#9633; Sidereal</button>'
+		o += '<span class="pcPrintGroup">'
+		o += '<span class="pcPrintLab">&#128438; Print</span>'
+		o += '<button class="intBtn3 pcZodBtn pcPrintBtn" onclick="pcPrintChart()" title="The wheel on its own, in the zodiac showing now">Chart</button>'
+		o += '<button class="intBtn3 pcZodBtn pcPrintBtn" onclick="pcPrintPlanets()" title="The positions on their own, in the zodiac showing now">Planets</button>'
+		o += '<button class="intBtn3 pcZodBtn pcPrintBtn" onclick="pcPrintBoth()" title="Tropical and sidereal positions side by side, no wheels">Both</button>'
+		o += '</span>'
+		o += '</div>'
+		o += '<div class="pcZodiacNote"><span class="profileWhen">Both are worked out from the same details &mdash; switch freely, nothing is re-entered.</span></div>'
+
+		o += '<div class="pcFields">'
+		o += '<div class="pcRow"><label class="pcLab">Born</label>'
+		o += pcField("pcY", "Year", f.y, 'pcInY', "")
+		o += pcField("pcM", "Month", f.m, '', ' min="1" max="12"')
+		o += pcField("pcD", "Day", f.d, '', ' min="1" max="31"')
+		o += '</div>'
+
+		// Time and Place are separate blocks, not two rows in a stack. They ran
+		// together before - the unknown-time tickbox sat at the end of the Time
+		// row and the birthplace tickbox at the start of the next, so the two
+		// read as one long line of options belonging to neither.
+		o += '<div class="pcBlock">'
+		o += '<div class="pcRow"><label class="pcLab">Time</label>'
+		if (f.timeKnown) {
+			o += pcField("pcHH", "Hour", f.hh, '', ' min="0" max="23"')
+			o += pcField("pcMM", "Minute", f.mm, '', ' min="0" max="59"')
+		} else {
+			o += '<span class="profileWhen pcUnknown">Using noon &mdash; no houses or Ascendant</span>'
+		}
+		o += '</div>'
+		o += '<div class="pcRow pcRowSub"><label class="pcLab"></label>'
+		o += '<label class="pcChk pcChkBox"><input type="checkbox"' + (f.timeKnown ? '' : ' checked') + ' onchange="pcToggleTime()"> I do not know my birth time</label>'
+		o += '</div>'
+		o += '</div>'
+
+		// No tickbox: the chart needs a birthplace either way, so offering to
+		// turn it off only ever produced a worse chart. Somewhere is always
+		// filled in, and it can simply be changed.
+		o += '<div class="pcBlock">'
+		o += '<div class="pcRow"><label class="pcLab">Place</label>'
+		o += '<input type="text" id="pcPlace" class="pcIn pcInPlace" value="' + authEsc(f.place) + '" placeholder="e.g. Brooklyn, New York" oninput="pcRedraw()">'
+		o += '<button class="profileMiniBtn" onclick="pcLookupPlace()">Find</button>'
+		o += '</div>'
+		o += '<div id="pcGeo" class="pcGeo"></div>'
+		o += '<div class="pcRow pcRowSub"><label class="pcLab"></label>'
+		o += pcField("pcLat", "Latitude", f.lat, '', ' step="0.0001"')
+		o += pcField("pcLon", "Longitude", f.lon, '', ' step="0.0001"')
+		o += pcField("pcTZ", "UTC offset", f.tz, '', ' step="0.25" oninput="pcTzEdited()"')
+		o += '</div>'
+		// The offset is the input people get wrong, and getting it wrong moves
+		// the Ascendant about a sign every two hours, so it says so rather than
+		// sitting there as one number box among three.
+		if (pcTzGuessed) {
+			o += '<div class="pcRow pcRowSub"><label class="pcLab"></label>'
+			o += '<span class="profileNote profileWarn pcTzNote">Offset guessed as '
+			o += (f.tz >= 0 ? "+" : "") + f.tz + ' from longitude &mdash; check the zone in force on that date, and add an hour for summer time.</span>'
+			o += '</div>'
+		}
+		o += '</div>'
+		o += '</div>'
+
+		// chart on the left, the reading beside it
+		o += '<div class="pcSplit">'
+		o += '<div class="pcCanvasWrap"><canvas id="pcCanvas"></canvas></div>'
+		o += '<div id="pcPlanets" class="pcReading"></div>'
+		o += '</div>'
+		o += '<div id="pcTransits"></div>'
+
 		profileBody(o, tok)
-		pcDraw()
+		// on the next frame, so the row has actually laid out - measuring the
+		// space for the chart in the same tick as the markup is written gives
+		// the width the panel had a moment ago, not the one it has now
+		if (typeof requestAnimationFrame === "function") requestAnimationFrame(pcDraw)
+		else pcDraw()
 	}).catch(function (err) { profileBody(profileErr(err), tok) })
+}
+
+// A number box with its own label underneath, so a bare row of three does not
+// leave anyone guessing which one is the month.
+function pcField(id, label, value, extraClass, attrs) {
+	var o = '<span class="pcFieldWrap">'
+	o += '<input type="number" id="' + id + '" class="pcIn ' + (extraClass || '') + '" value="' + value + '"' + (attrs || '') + ' oninput="pcRedraw()">'
+	o += '<span class="pcFieldLab">' + label + '</span>'
+	o += '</span>'
+	return o
 }
 
 function pcDraw() {
@@ -235,10 +261,25 @@ function pcDraw() {
 		return
 	}
 
+	// The chart takes the width the reading does not use.
+	//
+	// Measured from the row and the reading rather than from the canvas's own
+	// wrapper, which is circular: the wrapper is a flex item sized partly by
+	// the canvas inside it, so reading its width before sizing the canvas gives
+	// last frame's answer. When that came out too large, "max-width: 100%"
+	// clamped the rendered width while the inline height stood, and the chart
+	// was drawn into 250x440 - a square squashed to a tall rectangle.
 	var wrap = cvs.parentNode
-	var size = Math.max(240, Math.min(wrap.clientWidth || 360, 420))
+	var split = cvs.closest(".pcSplit")
+	var reading = split ? split.querySelector(".pcReading") : null
+
+	// CSS decides the box - width: 100% of the wrapper, capped, aspect-ratio 1 -
+	// so this only has to match the backing store to whatever that came out as.
+	// Nothing here sets a dimension, so nothing here can make it non-square.
+	var size = Math.round(cvs.getBoundingClientRect().width)
+	if (!size || size < 60) size = 300
+
 	var dpr = window.devicePixelRatio || 1
-	cvs.style.width = size + "px"; cvs.style.height = size + "px"
 	cvs.width = Math.floor(size * dpr); cvs.height = Math.floor(size * dpr)
 	var c = cvs.getContext("2d")
 	c.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -252,6 +293,223 @@ function pcDraw() {
 }
 
 function pcInk(v, fallback) { return astroCssVar(v, fallback) }
+
+// ---- printing -----------------------------------------------------------
+//
+// Three things worth having as an image: the chart on its own, the planet
+// positions on their own, and both zodiacs beside each other for comparison -
+// which the tab itself cannot show, because on screen a chart wants the whole
+// width and only one zodiac is up at a time.
+//
+// All of it is drawn onto a canvas rather than screenshotted through
+// html2canvas. The wheel already is a canvas, and drawing the positions the
+// same way means the two can share one image with a common background, which
+// a screenshot of two separate elements cannot do.
+//
+// Everything is laid out at a fixed size, so the file is identical whether it
+// was made on a phone or a desktop.
+
+var PC_PRINT = { pad: 30, head: 54, gap: 34, size: 460, line: 21, listW: 300 }
+
+function pcPrintFam() { return pcInk("--font-family", "Roboto Mono") + ", monospace" }
+function pcPad(n) { return (Number(n) < 10 ? "0" : "") + Number(n) }
+
+function pcBornLine(f) {
+	return f.y + "-" + pcPad(f.m) + "-" + pcPad(f.d) +
+		(f.timeKnown ? " " + pcPad(f.hh) + ":" + pcPad(f.mm) : " (time unknown)") +
+		"  ·  " + ((f.place || "").trim() || (f.lat + ", " + f.lon))
+}
+
+// One planet as a row of columns, so the names, degrees and signs line up down
+// the list instead of wandering with the length of the word before them.
+function pcDrawBody(c, b, x, y, fam) {
+	c.textAlign = "left"
+	c.font = "17px " + fam
+	c.fillStyle = pcPlanetColor(b.key)
+	c.fillText(b.glyph, x, y)
+
+	c.font = "13px " + fam
+	c.fillStyle = pcInk("--font-white-2", "#ccc")
+	c.fillText(b.name, x + 24, y)
+	c.fillText(b.deg + "°" + pcPad(b.min) + "'", x + 108, y)
+
+	c.fillStyle = pcSignColor(b.signIdx)
+	c.fillText(astroSigns[b.signIdx].name, x + 168, y)
+
+	if (b.house) {
+		c.fillStyle = pcInk("--font-white-4", "#889")
+		c.fillText("H" + b.house, x + 248, y)
+	}
+	if (b.retro) {
+		c.fillStyle = "hsl(15 70% 62%)"
+		c.fillText("℞", x + 278, y)
+	}
+}
+
+// Draws the positions block and returns how tall it turned out, so whatever
+// comes next knows where it starts.
+function pcDrawPositions(c, chart, x, y, fam) {
+	var line = PC_PRINT.line
+	var bodies = chart.bodies.slice()
+	// Same order the reading uses: Sun and Moon first, not alphabetical. The
+	// on-screen version groups these by house; a printed column reads better
+	// straight through, so the house is a column instead of a heading.
+	bodies.sort(function (a, b) { return pcRankOf(a) - pcRankOf(b) })
+
+	var yy = y
+	for (var i = 0; i < bodies.length; i++) {
+		pcDrawBody(c, bodies[i], x, yy, fam)
+		yy += line
+	}
+
+	if (chart.houses) {
+		yy += 6
+		c.font = "600 13px " + fam
+		c.fillStyle = pcSignColor(chart.ascSign.idx)
+		c.fillText("ASC " + astroSigns[chart.ascSign.idx].name, x, yy)
+		c.fillStyle = pcSignColor(chart.mcSign.idx)
+		c.fillText("MC " + astroSigns[chart.mcSign.idx].name, x + 150, yy)
+		yy += line
+	} else {
+		yy += 6
+		c.font = "12px " + fam
+		c.fillStyle = pcInk("--font-white-4", "#889")
+		c.fillText("No birth time, so no houses or Ascendant.", x, yy)
+		yy += line
+	}
+
+	if (chart.sidereal) {
+		c.font = "12px " + fam
+		c.fillStyle = pcInk("--font-white-4", "#889")
+		c.fillText("Lahiri ayanamsa " + chart.ayanamsa.toFixed(2) + "°", x, yy)
+		yy += line
+	}
+	return yy - y
+}
+
+function pcPrintSurface(w, h) {
+	var scale = 2
+	var out = document.createElement("canvas")
+	out.width = w * scale
+	out.height = h * scale
+	var c = out.getContext("2d")
+	c.setTransform(scale, 0, 0, scale, 0, 0)
+	c.fillStyle = window.getComputedStyle(document.body).getPropertyValue("background-color") || "#161a22"
+	c.fillRect(0, 0, w, h)
+	return { canvas: out, c: c }
+}
+
+function pcPrintHeading(c, f, w, fam) {
+	c.textAlign = "center"
+	c.fillStyle = pcInk("--font-white-1", "#eee")
+	c.font = "600 21px " + fam
+	c.fillText((f.name || "").trim() || "Natal chart", w / 2, 30)
+	// a step brighter than the on-screen equivalent: this line is the only
+	// record of what the image is a chart of, and --font-white-4 is barely there
+	c.fillStyle = pcInk("--font-white-3", "#aab")
+	c.font = "14px " + fam
+	c.fillText(pcBornLine(f), w / 2, 47)
+}
+
+function pcPrintFile(f, what) {
+	var title = (f.name || "").trim()
+	return (title ? title.replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") + "_" : "") +
+		f.y + "-" + pcPad(f.m) + "-" + pcPad(f.d) + "_" + what + ".png"
+}
+
+function pcPrintChart()   { pcPrintImage("chart") }
+function pcPrintPlanets() { pcPrintImage("planets") }
+function pcPrintBoth()    { pcPrintImage("both") }
+
+function pcPrintImage(kind) {
+	if (typeof pcDrawWheel !== "function") return
+	var f = pcCapture()
+
+	var tro, sid, cur
+	try {
+		tro = pcBuildChart(f, "tropical")
+		sid = pcBuildChart(f, "sidereal")
+		cur = (pcZodiac === "sidereal") ? sid : tro
+	} catch (e) {
+		displayCalcNotification("Check the date before printing", 2400)
+		return
+	}
+
+	var P = PC_PRINT
+	var fam = pcPrintFam()
+	var zodName = (pcZodiac === "sidereal") ? "□ Sidereal (Lahiri)" : "○ Tropical"
+	var surf, c, w, h
+
+	if (kind === "chart") {
+		w = P.size + P.pad * 2
+		h = P.head + 26 + P.size + P.pad
+		surf = pcPrintSurface(w, h); c = surf.c
+		pcPrintHeading(c, f, w, fam)
+
+		c.textAlign = "center"
+		c.font = "600 15px " + fam
+		c.fillStyle = pcInk("--font-white-2", "#ccc")
+		c.fillText(zodName, w / 2, P.head + 16)
+
+		c.save(); c.translate(P.pad, P.head + 26)
+		if (pcZodiac === "sidereal") pcDrawSquare(c, P.size, cur); else pcDrawWheel(c, P.size, cur)
+		c.restore()
+
+	} else if (kind === "planets") {
+		// measured first, on a throwaway context, so the canvas is exactly as
+		// tall as the list rather than a guess with a gap at the bottom
+		var probe = document.createElement("canvas").getContext("2d")
+		var listH = pcDrawPositions(probe, cur, 0, 0, fam)
+
+		w = P.listW + P.pad * 2
+		h = P.head + 26 + listH + P.pad
+		surf = pcPrintSurface(w, h); c = surf.c
+		pcPrintHeading(c, f, w, fam)
+
+		c.textAlign = "center"
+		c.font = "600 15px " + fam
+		c.fillStyle = pcInk("--font-white-2", "#ccc")
+		c.fillText("Planets at birth · " + zodName, w / 2, P.head + 16)
+
+		pcDrawPositions(c, cur, P.pad, P.head + 42, fam)
+
+	} else {
+		// Both: the two readings side by side, positions only.
+		//
+		// No wheels. The point of putting tropical next to sidereal is to read
+		// off what moved, and that is entirely in the numbers - two diagrams
+		// differing by 24° tell you nothing you can measure by eye, and they
+		// were making a page-and-a-half of image out of two short columns.
+		var probe2 = document.createElement("canvas").getContext("2d")
+		var hTro = pcDrawPositions(probe2, tro, 0, 0, fam)
+		var hSid = pcDrawPositions(probe2, sid, 0, 0, fam)
+
+		var colW = P.listW
+		w = colW * 2 + P.gap + P.pad * 2
+		h = P.head + 26 + Math.max(hTro, hSid) + P.pad
+
+		surf = pcPrintSurface(w, h); c = surf.c
+		pcPrintHeading(c, f, w, fam)
+
+		var cols = [
+			{ x: P.pad, chart: tro, label: "○ Tropical" },
+			{ x: P.pad + colW + P.gap, chart: sid, label: "□ Sidereal (Lahiri)" }
+		]
+		for (var i = 0; i < cols.length; i++) {
+			var col = cols[i]
+			c.textAlign = "center"
+			c.font = "600 16px " + fam
+			c.fillStyle = pcInk("--font-white-2", "#ccc")
+			c.fillText(col.label, col.x + colW / 2, P.head + 16)
+			pcDrawPositions(c, col.chart, col.x, P.head + 42, fam)
+		}
+	}
+
+	var what = (kind === "chart") ? "astro_chart" : (kind === "planets") ? "planets" : "astro_charts"
+	showPrintImagePreview(surf.canvas.toDataURL("image/png"), pcPrintFile(f, what), "", 1)
+	// Refresh is hard-wired to openImageWindow, which cannot rebuild these
+	$(".refreshImgBtn").attr("onclick", "closePrintImagePreview();pcPrintImage('" + kind + "')")
+}
 
 // Tropical: the familiar round wheel.
 function pcDrawWheel(c, size, chart) {
@@ -278,19 +536,39 @@ function pcDrawWheel(c, size, chart) {
 		c.beginPath(); c.moveTo(p0.x, p0.y); c.lineTo(p1.x, p1.y); c.stroke()
 
 		var mid = astroPolar(cx, cy, (rSign + rOuter) / 2, astroWheelAngle(i * 30 + 15, rot))
-		c.fillStyle = faint
+		c.fillStyle = pcSignColor(i)
 		c.fillText(astroSigns[i].glyph, mid.x, mid.y)
+	}
+
+	// Aspect lines across the middle. The chart has always worked these out;
+	// the wheel just never drew them, which is most of what a wheel is for.
+	// Colour says which aspect, dash says how wide the orb is.
+	if (chart.aspects && chart.aspects.length) {
+		for (var ai = 0; ai < chart.aspects.length; ai++) {
+			var asp = chart.aspects[ai]
+			var pA = astroPolar(cx, cy, rInner, astroWheelAngle(asp.a.lon, rot))
+			var pB = astroPolar(cx, cy, rInner, astroWheelAngle(asp.b.lon, rot))
+			c.strokeStyle = astroAspectColor(asp.aspect.ang)
+			// a tight aspect is drawn solid and a little stronger
+			c.globalAlpha = asp.exact ? 0.9 : 0.45
+			c.lineWidth = asp.exact ? 1.4 : 1
+			c.setLineDash(asp.exact ? [] : [3, 3])
+			c.beginPath(); c.moveTo(pA.x, pA.y); c.lineTo(pB.x, pB.y); c.stroke()
+		}
+		c.setLineDash([])
+		c.globalAlpha = 1
+		c.lineWidth = 1
 	}
 
 	for (var b = 0; b < chart.bodies.length; b++) {
 		var body = chart.bodies[b]
 		var pa = astroWheelAngle(body.lon, rot)
 		var pt = astroPolar(cx, cy, rSign - 14, pa)
-		c.fillStyle = astroPlanetColor(body.key)
+		c.fillStyle = pcPlanetColor(body.key)
 		c.font = "15px " + (window.coderainFontStack || "sans-serif")
 		c.fillText(body.glyph, pt.x, pt.y)
 		var tick = astroPolar(cx, cy, rInner, pa), tick2 = astroPolar(cx, cy, rInner + 6, pa)
-		c.strokeStyle = astroPlanetColor(body.key)
+		c.strokeStyle = pcPlanetColor(body.key)
 		c.beginPath(); c.moveTo(tick.x, tick.y); c.lineTo(tick2.x, tick2.y); c.stroke()
 	}
 
@@ -334,15 +612,15 @@ function pcDrawSquare(c, size, chart) {
 		c.strokeStyle = line
 		c.strokeRect(x + 0.5, y + 0.5, cell - 1, cell - 1)
 
-		c.fillStyle = faint
-		c.font = "11px " + (window.coderainFontStack || "sans-serif")
+		c.fillStyle = pcSignColor(i)
+		c.font = "12px " + (window.coderainFontStack || "sans-serif")
 		c.textBaseline = "top"
 		c.fillText(astroSigns[i].glyph, x + cell / 2, y + 4)
 
 		var here = inSign[i] || []
 		c.font = "13px " + (window.coderainFontStack || "sans-serif")
 		for (var k = 0; k < here.length; k++) {
-			c.fillStyle = astroPlanetColor(here[k].key)
+			c.fillStyle = pcPlanetColor(here[k].key)
 			c.fillText(here[k].glyph, x + cell / 2, y + 20 + k * 15)
 		}
 
@@ -356,29 +634,200 @@ function pcDrawSquare(c, size, chart) {
 	}
 }
 
+// Short, conventional meanings. Deliberately terse and deliberately generic:
+// this is the standard textbook significance of a placement, not a reading.
+var pcPlanetMeaning = {
+	sun: "Core self, vitality, what you are here to become.",
+	moon: "Instincts, moods, what makes you feel safe.",
+	mercury: "Thinking and speaking - how you take information in and pass it on.",
+	venus: "Attraction, taste, how you value and relate.",
+	mars: "Drive and appetite - how you push, and what you fight for.",
+	jupiter: "Growth, luck and belief - where you expand.",
+	saturn: "Limits, duty and time - where the work is, and the reward for it.",
+	uranus: "Disruption and independence - where you break the pattern.",
+	neptune: "Imagination and dissolution - where the edges blur.",
+	pluto: "Power and transformation - what is torn down and rebuilt."
+}
+
+var pcHouseMeaning = [
+	"", // 1-based
+	"1st - self, body, how you arrive in a room.",
+	"2nd - money, possessions, what you value.",
+	"3rd - speech, siblings, short journeys, everyday learning.",
+	"4th - home, roots, family, the private self.",
+	"5th - play, romance, children, what you make.",
+	"6th - work, routine, health, service.",
+	"7th - partnership, marriage, open enemies.",
+	"8th - shared resources, death and rebirth, what is hidden.",
+	"9th - travel, philosophy, higher learning, belief.",
+	"10th - career, reputation, standing in the world.",
+	"11th - friends, networks, hopes.",
+	"12th - solitude, the unconscious, what undoes you."
+]
+
+var pcAspectMeaning = {
+	"Conjunction": "Fused - the two act as one, for better or worse.",
+	"Opposition": "Pulled apart - a tension you balance rather than solve.",
+	"Trine": "Easy flow - talent that comes cheaply enough to be taken for granted.",
+	"Square": "Friction that forces action. Uncomfortable, and productive.",
+	"Sextile": "Opportunity, if you take it up.",
+	"Quincunx": "Awkward fit - two things that never quite agree.",
+	"Semisextile": "Mild adjustment.",
+	"Semisquare": "Low-level irritation that builds.",
+	"Sesquiquadrate": "Delayed friction, surfacing under pressure."
+}
+
+// Traditional colours for each body. pcPlanetColor() in astrology.js is
+// tuned for the 3D solar system - realistic planet surfaces, and no entry for
+// the Sun at all, which fell through to grey - so the chart carries its own.
+var pcPlanetColors = {
+	sun:     "hsl(45 95% 62%)",   // gold
+	moon:    "hsl(210 18% 86%)",  // silver
+	mercury: "hsl(30 70% 66%)",   // quicksilver orange
+	venus:   "hsl(150 55% 62%)",  // green
+	mars:    "hsl(5 80% 62%)",    // red
+	jupiter: "hsl(275 55% 70%)",  // royal purple
+	saturn:  "hsl(35 30% 55%)",   // lead brown
+	uranus:  "hsl(185 75% 62%)",  // electric turquoise
+	neptune: "hsl(225 70% 68%)",  // sea blue
+	pluto:   "hsl(345 45% 52%)"   // dark maroon
+}
+
+function pcPlanetColor(key) {
+	return pcPlanetColors[key] || "hsl(0 0% 80%)"
+}
+
+// One colour per sign rather than one per element: the elements only give four
+// and the wheel has twelve slices to tell apart.
+var pcSignColors = [
+	"hsl(0 75% 62%)",    // Aries - red
+	"hsl(120 40% 58%)",  // Taurus - green
+	"hsl(52 85% 65%)",   // Gemini - yellow
+	"hsl(200 35% 78%)",  // Cancer - moonlit silver-blue
+	"hsl(38 90% 60%)",   // Leo - gold
+	"hsl(95 35% 55%)",   // Virgo - earth green
+	"hsl(330 60% 72%)",  // Libra - rose
+	"hsl(350 60% 48%)",  // Scorpio - deep crimson
+	"hsl(280 60% 68%)",  // Sagittarius - purple
+	"hsl(25 25% 48%)",   // Capricorn - brown
+	"hsl(175 70% 58%)",  // Aquarius - teal
+	"hsl(255 45% 72%)"   // Pisces - violet
+]
+
+function pcSignColor(idx) {
+	return pcSignColors[idx] || "hsl(0 0% 70%)"
+}
+
+// Reading order. The luminaries first, then the personal planets, then the
+// rest - so a house holding the Sun is read before one holding Neptune, and
+// the Sun is read before Pluto inside the same house. Not the order the
+// ephemeris returns them in, which is by orbit.
+var pcPlanetRank = {
+	sun: 0, moon: 1, venus: 2, mars: 3, mercury: 4,
+	jupiter: 5, saturn: 6, uranus: 7, neptune: 8, pluto: 9
+}
+
+function pcRankOf(b) {
+	var r = pcPlanetRank[b.key]
+	return (r === undefined) ? 99 : r
+}
+
+var pcSignMeaning = {
+	Aries: "Cardinal fire, ruled by Mars. Starts things; impatient with what it did not start.",
+	Taurus: "Fixed earth, ruled by Venus. Steady, sensual, immovable once settled.",
+	Gemini: "Mutable air, ruled by Mercury. Curious, quick, two things at once.",
+	Cancer: "Cardinal water, ruled by the Moon. Protective, tidal, keeps what matters.",
+	Leo: "Fixed fire, ruled by the Sun. Warm, proud, needs to be seen.",
+	Virgo: "Mutable earth, ruled by Mercury. Precise, useful, hard on itself.",
+	Libra: "Cardinal air, ruled by Venus. Weighs everything; relates rather than acts alone.",
+	Scorpio: "Fixed water, ruled by Mars and Pluto. Intense, private, all or nothing.",
+	Sagittarius: "Mutable fire, ruled by Jupiter. Restless, candid, chasing the bigger picture.",
+	Capricorn: "Cardinal earth, ruled by Saturn. Patient, ambitious, plays the long game.",
+	Aquarius: "Fixed air, ruled by Saturn and Uranus. Detached, principled, deliberately odd.",
+	Pisces: "Mutable water, ruled by Jupiter and Neptune. Porous, imaginative, hard to pin down."
+}
+
+// Hover text rides on a data attribute and is shown by one shared tooltip,
+// rather than the browser's title, which takes a second to appear and cannot
+// be styled.
+function pcTip(text) {
+	return ' data-pctip="' + authEsc(text) + '"'
+}
+
 function pcListPlanets(chart) {
 	var host = document.getElementById("pcPlanets")
 	if (host === null) return
+
 	var o = '<div class="pcSectionTitle">Planets at birth</div>'
-	o += '<div class="pcGrid">'
-	for (var i = 0; i < chart.bodies.length; i++) {
-		var b = chart.bodies[i]
-		o += '<div class="pcCell">'
-		o += '<span class="pcGlyph" style="color:' + astroPlanetColor(b.key) + '">' + b.glyph + '</span>'
-		o += '<span class="pcBody">' + authEsc(b.name) + '</span>'
-		o += '<span class="pcPos">' + b.deg + '&deg;' + (b.min < 10 ? "0" : "") + b.min + "' " + authEsc(astroSigns[b.signIdx].name) + '</span>'
-		if (b.retro) o += '<span class="pcRetro" title="Retrograde">&#8479;</span>'
-		if (b.house) o += '<span class="pcHouse">H' + b.house + '</span>'
+
+	if (chart.houses) {
+		// Grouped by house, since that is the question being asked, but the
+		// planets inside each house keep their Sun-Moon-Mercury order rather
+		// than being re-sorted, so the important ones still read first.
+		var byHouse = {}
+		for (var i = 0; i < chart.bodies.length; i++) {
+			var h = chart.bodies[i].house || 0
+			if (!byHouse[h]) byHouse[h] = []
+			byHouse[h].push(chart.bodies[i])
+		}
+
+		// Houses are listed by the most important planet each one holds, not
+		// 1 to 12: whichever house the Sun is in is the one to read first,
+		// even if that puts House 9 above House 2.
+		var blocks = []
+		for (var hn = 1; hn <= 12; hn++) {
+			var here = byHouse[hn]
+			if (!here || !here.length) continue
+			here.sort(function (a, b) { return pcRankOf(a) - pcRankOf(b) })
+			blocks.push({ house: hn, bodies: here, rank: pcRankOf(here[0]) })
+		}
+		blocks.sort(function (a, b) { return a.rank - b.rank || a.house - b.house })
+
+		o += '<div class="pcHouses">'
+		for (var bi = 0; bi < blocks.length; bi++) {
+			var blk = blocks[bi]
+			o += '<div class="pcHouseBlock">'
+			o += '<div class="pcHouseHead"' + pcTip(pcHouseMeaning[blk.house]) + '>House ' + blk.house + '</div>'
+			for (var k = 0; k < blk.bodies.length; k++) o += pcBodyLine(blk.bodies[k])
+			o += '</div>'
+		}
+		o += '</div>'
+	} else {
+		var flat = chart.bodies.slice()
+		flat.sort(function (a, b) { return pcRankOf(a) - pcRankOf(b) })
+		o += '<div class="pcHouses">'
+		for (var b = 0; b < flat.length; b++) o += pcBodyLine(flat[b])
 		o += '</div>'
 	}
-	o += '</div>'
-	if (!chart.houses) {
-		o += '<div class="profileNote">No birth time or place, so there are no houses and no Ascendant. Everything above is still accurate to within a fraction of a degree, apart from the Moon.</div>'
+
+	if (chart.houses) {
+		o += '<div class="pcAngles">'
+		o += '<span style="color:' + pcSignColor(chart.ascSign.idx) + '"' + pcTip("Ascendant - the sign rising on the eastern horizon at birth. How you meet the world.") + '>ASC ' + authEsc(astroSigns[chart.ascSign.idx].name) + '</span>'
+		o += '<span style="color:' + pcSignColor(chart.mcSign.idx) + '"' + pcTip("Midheaven - the highest point of the chart. Career, reputation, what you are known for.") + '>MC ' + authEsc(astroSigns[chart.mcSign.idx].name) + '</span>'
+		o += '</div>'
+	} else {
+		o += '<div class="profileNote">No birth time, so no houses and no Ascendant. Everything above is still accurate to a fraction of a degree, apart from the Moon.</div>'
 	}
 	if (chart.sidereal) {
-		o += '<div class="profileNote">Sidereal, Lahiri ayanamsa &mdash; ' + chart.ayanamsa.toFixed(2) + '&deg; behind the tropical zodiac at this date.</div>'
+		// Short enough not to set the column's width. The full sentence was the
+		// widest thing in the reading, so it alone decided how much room was
+		// left for the chart beside it.
+		o += '<div class="profileNote pcAyan">Lahiri ayanamsa ' + chart.ayanamsa.toFixed(2) + '&deg;</div>'
 	}
 	host.innerHTML = o
+}
+
+function pcBodyLine(b) {
+	var tip = (pcPlanetMeaning[b.key] || "") + (b.retro ? " Retrograde: turned inward, working in reverse." : "")
+	var o = '<div class="pcCell"' + pcTip(tip) + '>'
+	o += '<span class="pcGlyph" style="color:' + pcPlanetColor(b.key) + '">' + b.glyph + '</span>'
+	o += '<span class="pcBody">' + authEsc(b.name) + '</span>'
+	var signName = astroSigns[b.signIdx].name
+	o += '<span class="pcPos">' + b.deg + '&deg;' + (b.min < 10 ? "0" : "") + b.min + "'</span>"
+	o += '<span class="pcSign" style="color:' + pcSignColor(b.signIdx) + '"' + pcTip(signName + " - " + (pcSignMeaning[signName] || "")) + '>' + authEsc(signName) + '</span>'
+	if (b.retro) o += '<span class="pcRetro">&#8479;</span>'
+	o += '</div>'
+	return o
 }
 
 function pcListTransits(chart) {
@@ -395,19 +844,65 @@ function pcListTransits(chart) {
 	o += '<div class="pcTransitList">'
 	for (var i = 0; i < t.hits.length; i++) {
 		var h = t.hits[i]
-		o += '<div class="pcTransit">'
-		o += '<span class="pcGlyph" style="color:' + astroPlanetColor(h.t.key) + '">' + h.t.glyph + '</span>'
+		var tip = (pcAspectMeaning[h.aspect.name] || "") +
+			" Transiting " + h.t.name + " is contacting your natal " + h.n.name + ". " +
+			(pcPlanetMeaning[h.n.key] || "")
+		o += '<div class="pcTransit"' + pcTip(tip) + '>'
+		o += '<span class="pcGlyph" style="color:' + pcPlanetColor(h.t.key) + '">' + h.t.glyph + '</span>'
 		o += '<span class="pcBody">' + authEsc(h.t.name) + '</span>'
 		o += '<span class="pcAspect" style="color:' + astroAspectColor(h.aspect.ang) + '">' + authEsc(h.aspect.name) + '</span>'
-		o += '<span class="pcGlyph" style="color:' + astroPlanetColor(h.n.key) + '">' + h.n.glyph + '</span>'
+		o += '<span class="pcGlyph" style="color:' + pcPlanetColor(h.n.key) + '">' + h.n.glyph + '</span>'
 		o += '<span class="pcBody">natal ' + authEsc(h.n.name) + '</span>'
 		o += '<span class="pcOrb">' + h.orb.toFixed(1) + '&deg;</span>'
 		o += '</div>'
 	}
 	o += '</div>'
-	o += '<div class="profileNote">Slow movers only, within 3&deg;. The Moon and Sun move too fast to be worth listing.</div>'
+	o += '<div class="profileNote">Slow movers within 3&deg;. Hover any line for what it means.</div>'
 	host.innerHTML = o
 }
+
+// ---- hover explanations -------------------------------------------------
+//
+// One tooltip element reused for every hover, following the pointer and
+// hidden on the way out. Bound through a delegated handler so it survives the
+// redraws this tab does on every keystroke.
+
+function pcTipShow(e) {
+	var text = e.currentTarget.getAttribute("data-pctip")
+	if (!text) return
+	var tip = document.getElementById("pcTipBox")
+	if (tip === null) {
+		tip = document.createElement("div")
+		tip.id = "pcTipBox"
+		tip.className = "pcTipBox"
+		document.body.appendChild(tip)
+	}
+	tip.textContent = text
+	tip.classList.remove("hideValue")
+	pcTipMove(e)
+}
+
+function pcTipMove(e) {
+	var tip = document.getElementById("pcTipBox")
+	if (tip === null) return
+	var pad = 14
+	var x = e.clientX + pad, y = e.clientY + pad
+	if (x + tip.offsetWidth > window.innerWidth - 8) x = e.clientX - tip.offsetWidth - pad
+	if (y + tip.offsetHeight > window.innerHeight - 8) y = e.clientY - tip.offsetHeight - pad
+	tip.style.left = Math.max(4, x) + "px"
+	tip.style.top = Math.max(4, y) + "px"
+}
+
+function pcTipHide() {
+	var tip = document.getElementById("pcTipBox")
+	if (tip !== null) tip.classList.add("hideValue")
+}
+
+$(document).ready(function () {
+	$("body").on("mouseenter", "[data-pctip]", pcTipShow)
+	$("body").on("mousemove", "[data-pctip]", pcTipMove)
+	$("body").on("mouseleave", "[data-pctip]", pcTipHide)
+})
 
 // ---- place lookup ------------------------------------------------------
 
@@ -449,6 +944,18 @@ function pcLookupPlace() {
 		})
 }
 
+// Picking a place has to set the UTC offset as well as the coordinates.
+//
+// It did not, and the offset stayed on whatever it was - 0 for anyone who had
+// not touched it. So a birth time entered as local Brooklyn time was read as
+// UTC, four hours out, and the Ascendant came back two signs wrong: Gemini
+// 16°44' for a chart whose Ascendant is Leo 8°31'. The angles were right all
+// along; they were being asked about the wrong moment.
+//
+// Longitude only gives solar time, so the offset is a starting guess: real
+// zones follow borders, some are on the half hour, and daylight saving depends
+// on the date. It is set and then said out loud, the same as the Astrology tab
+// has always done.
 function pcPickPlace(i) {
 	var r = pcGeoResults[i]
 	if (!r) return
@@ -456,8 +963,14 @@ function pcPickPlace(i) {
 	pcForm.place = r.label
 	pcForm.lat = r.lat
 	pcForm.lon = r.lon
+	pcForm.tz = Math.round(r.lon / 15)
+	pcTzGuessed = true
 	renderProfileChart()
 }
+
+// set when the offset came from a place rather than from the user, so the note
+// appears once and goes away as soon as they touch the field
+var pcTzGuessed = false
 
 // ---- saving ------------------------------------------------------------
 
@@ -470,13 +983,13 @@ function pcSave() {
 	chartSave(f.name.trim(), {
 		birth_date: f.y + "-" + pad(f.m) + "-" + pad(f.d),
 		birth_time: f.timeKnown ? (pad(f.hh) + ":" + pad(f.mm)) : "",
-		place: f.usePlace ? f.place : "",
-		latitude: f.usePlace ? f.lat : null,
-		longitude: f.usePlace ? f.lon : null,
-		tz_offset: f.usePlace ? f.tz : null,
+		place: f.place,
+		latitude: f.lat,
+		longitude: f.lon,
+		tz_offset: f.tz,
 		zodiac: pcZodiac,
 		time_known: f.timeKnown,
-		use_place: f.usePlace
+		use_place: true // kept for the column; a birthplace is no longer optional
 	}).then(function (what) {
 		displayCalcNotification(what === "updated" ? "Chart updated" : "Chart saved", 1800)
 		renderProfileChart()
@@ -498,13 +1011,13 @@ function pcOpen(id) {
 			y: Number(parts[0]) || 2000, m: Number(parts[1]) || 1, d: Number(parts[2]) || 1,
 			hh: Number(time[0]) || 12, mm: Number(time[1]) || 0,
 			timeKnown: r.time_known !== false,
-			usePlace: r.use_place !== false,
 			place: r.place || "",
 			lat: (r.latitude === null || r.latitude === undefined) ? 51.5074 : r.latitude,
 			lon: (r.longitude === null || r.longitude === undefined) ? -0.1278 : r.longitude,
 			tz: (r.tz_offset === null || r.tz_offset === undefined) ? 0 : r.tz_offset
 		}
 		pcEditingId = r.id
+		pcTzGuessed = false // a saved chart's offset is whatever was saved
 		if (r.zodiac === "sidereal" || r.zodiac === "tropical") pcZodiac = r.zodiac
 		renderProfileChart()
 	}).catch(function (err) {
@@ -515,11 +1028,12 @@ function pcOpen(id) {
 function pcNew() {
 	pcForm = pcDefaultForm()
 	pcEditingId = null
+	pcTzGuessed = false
 	renderProfileChart()
 }
 
-function pcDelete(id, name) {
-	if (!window.confirm('Delete the saved chart "' + name + '"?')) return
+function pcDelete(btn, id) {
+	if (!profileConfirmClick(btn)) return
 	chartDelete(id).then(function () {
 		if (pcEditingId === id) { pcEditingId = null }
 		renderProfileChart()

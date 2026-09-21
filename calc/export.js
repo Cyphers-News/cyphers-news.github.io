@@ -14,24 +14,73 @@ var ctxExportItems = [
 	{ label: "Print Cyphers Card",     btn: "#btn-print-breakdown-details-png", need: "#BreakdownDetails" },
 	{ label: "Print Number Properties",btn: "#btn-num-props-png",               need: ".numPropTooltip" },
 	{ label: "Print Date Durations",   btn: "#btn-date-calc-png",               need: ".dateCalcTable2" },
+	{ label: "Print Astrology Chart",  btn: "#btn-astro-chart-png",             need: "#astroCanvas" },
 	{ sep: true },
 	{ label: "Export History (CSV)",   btn: "#btn-export-history-png",          need: ".HistoryTable" },
 	{ label: "Export Matches (TXT)",   btn: "#btn-export-matches-txt",          need: ".HistoryTable" },
 	{ label: "Export DB Query (CSV)",  btn: "#btn-export-db-query",             need: "#QueryTable" },
 	{ sep: true },
 	{ label: "Edit Table Caption",     action: "editTableCaption",              need: ".HistoryTable" },
-	{ label: "Clear History Table",    action: "clearHistoryTable",             need: ".HistoryTable", danger: true }
+	{ label: "Clear History Table",    action: "clearHistoryTable",             need: ".HistoryTable", danger: true },
+	{ label: "Reset Settings to Default", action: "resetDefaults",              need: "#calcOptionsPanel", danger: true,
+	  confirm: "Sure? Clears the table too" }
 ]
 
+// Set while a guided-tour step is deliberately keeping this menu open
+// (calc/tour.js "Right-click anywhere" step) - checked here rather than at
+// every call site below, so a tour-triggered open behaves exactly like a
+// real one everywhere except this one guard, and the tour's own Next/Back
+// clicks (which land outside #ctxExportMenu, same as an ordinary
+// click-away) do not close it out from under the spotlight.
+var ctxExportTourLock = false
+
 function closeExportContextMenu() {
+	if (ctxExportTourLock) return
 	$("#ctxExportMenu").remove()
 }
 
-function runExportContextItem(idx) {
-	closeExportContextMenu()
+// hovering anything else cancels the arming, so a second click always lands on
+// the item the pointer is actually over
+function ctxExportDisarmOthers(idx) {
+	$("#ctxExportMenu .ctxExportArmed").each(function () {
+		if (Number($(this).attr("data-idx")) === idx) return
+		var item = ctxExportItems[Number($(this).attr("data-idx"))]
+		$(this).removeClass("ctxExportArmed").text(item ? item.label : "")
+	})
+}
+
+// puts an armed item back to its own label, so moving to another entry does not
+// leave "Sure?" sitting there ready to fire
+function ctxExportDisarm() {
+	$("#ctxExportMenu .ctxExportArmed").each(function () {
+		var item = ctxExportItems[Number($(this).attr("data-idx"))]
+		$(this).removeClass("ctxExportArmed").text(item ? item.label : "")
+	})
+}
+
+function runExportContextItem(idx, el) {
 	var item = ctxExportItems[idx]
 	if (!item || item.sep) return
 	if (item.need && $(item.need).length === 0) return
+
+	// Throwing away every cypher, colour and option is too much to do on a
+	// mis-click, so an item carrying `confirm` asks first and stays open to be
+	// clicked a second time. Nothing else in this menu loses anything that
+	// cannot be got back, which is why they still fire straight away.
+	if (item.confirm && el) {
+		var $el = $(el)
+		if (!$el.hasClass("ctxExportArmed")) {
+			ctxExportDisarm()
+			$el.addClass("ctxExportArmed").text(item.confirm)
+			return
+		}
+	}
+
+	closeExportContextMenu()
+	if (item.action === "resetDefaults") {
+		if (typeof resetCalcToDefaults === "function") resetCalcToDefaults(false)
+		return
+	}
 	if (item.action === "clearHistoryTable") {
 		phraseBoxKeypress(36) // "Home" keystroke, the app's own clear-history path
 		return
@@ -52,8 +101,8 @@ function showExportContextMenu(px, py) {
 		var item = ctxExportItems[i]
 		if (item.sep) { o += '<div class="ctxExportSep"></div>'; continue }
 		var avail = $(item.need).length > 0
-		o += '<div class="ctxExportItem'+(avail ? '' : ' ctxExportDisabled')+(item.danger ? ' ctxExportDanger' : '')+'"'
-		o += avail ? ' onclick="runExportContextItem('+i+')"' : ' title="Not available right now"'
+		o += '<div class="ctxExportItem'+(avail ? '' : ' ctxExportDisabled')+(item.danger ? ' ctxExportDanger' : '')+'" data-idx="'+i+'"'
+		o += avail ? ' onclick="runExportContextItem('+i+', this)" onmouseenter="ctxExportDisarmOthers('+i+')"' : ' title="Not available right now"'
 		o += '>'+item.label+'</div>'
 	}
 	o += '</div>'
@@ -136,13 +185,53 @@ function restoreBreakdownExport() {
 	$('#SimpleBreak').removeClass('hideValue')
 }
 
+// html2canvas (164KB) is only needed once someone actually exports an image,
+// so it isn't in index.html's script list any more - loaded on first call
+// here instead, so everyone else's page load doesn't pay for it.
+var html2canvasPromise = null
+function ensureHtml2Canvas() {
+	if (typeof html2canvas !== "undefined") return Promise.resolve()
+	if (html2canvasPromise === null) {
+		html2canvasPromise = new Promise(function (resolve, reject) {
+			var s = document.createElement('script')
+			s.src = 'lib/html2canvas.min.js?v=20260809a'
+			s.onload = resolve
+			s.onerror = reject
+			document.head.appendChild(s)
+		})
+	}
+	return html2canvasPromise
+}
+
 function openImageWindow(element, imgName = "", sRatio = window.devicePixelRatio, refresh = false) { // sRatio is scaling, refresh - update the image only
+	ensureHtml2Canvas().then(function () {
+		openImageWindowImpl(element, imgName, sRatio, refresh)
+	}, function () {
+		displayCalcNotification("The image exporter could not be loaded", 2500)
+	})
+}
+
+function openImageWindowImpl(element, imgName, sRatio, refresh) {
 	var imageDataURL, wnd, scl
+	if ( !$(element).length ) { // nothing on screen to capture - say so rather than do nothing
+		displayCalcNotification("There is nothing to print here yet", 2200)
+		return
+	}
 	if ( $(element).length ) { // if specified element exists
 		// if browser zoom level is more than passed value, use current zoom level
 		if (isNaN(sRatio)) { sRatio = window.devicePixelRatio }
 		if (element == '#ChartSpot') { // remove space and backspace labels from Cipher Chart
 			$('#spaceChartBtn').text('');$('#backspaceChartBtn').text('');
+			// On a narrow screen fitCipherChart() has shrunk #ChartTable with
+			// CSS zoom so it fits the page without a scrollbar. html2canvas does
+			// not account for zoom the way a real browser paints it, so
+			// capturing while shrunk clips the table at its pre-zoom (full)
+			// width instead of scaling the capture down to match - the
+			// right-hand columns simply fall outside the canvas. Exporting
+			// wants the real, undistorted chart anyway, so drop the zoom for
+			// the capture and let fitCipherChart() put it back below.
+			var chartTableEl = document.getElementById('ChartTable')
+			if (chartTableEl !== null) chartTableEl.style.zoom = ""
 		}
 		// html2canvas($(element)[0], {allowTaint: false, backgroundColor: window.getComputedStyle(document.querySelector('body')).getPropertyValue('background-color'), width: $(element).outerWidth()+2, height: $(element).outerHeight()+2, scale: sRatio} ).then((canvas) => { // e.g. html2canvas($("#ChartTable")[0]).then ...
 		html2canvas($(element)[0], {allowTaint: false, backgroundColor: "rgba(0,0,0,0)", width: $(element).outerWidth()+10, height: $(element).outerHeight()+10, scale: sRatio} ).then((canvas) => { // e.g. html2canvas($("#ChartTable")[0]).then ...
@@ -168,6 +257,16 @@ function openImageWindow(element, imgName = "", sRatio = window.devicePixelRatio
 
 			if (element == '#BreakdownSpot') restoreBreakdownExport() // strip the export-only header
 
+			// put the on-screen chart back to its fitted mobile size, now that
+			// the full-size capture above is done with it
+			if (element == '#ChartSpot' && typeof fitCipherChart === "function") fitCipherChart()
+
+			// an empty capture (a hidden or blank area) has nothing to save
+			if (imageDataURL === null) {
+				displayCalcNotification("There is nothing to print here yet", 2200)
+				return
+			}
+
 			imgName = imgName.replace(/'/g, '')
 			if (imgName == "" || imgName.length >= 200) imgName = getTimestamp()+".png"; // filename for download button (200 char limit)
 
@@ -179,8 +278,11 @@ function openImageWindow(element, imgName = "", sRatio = window.devicePixelRatio
 				showPrintImagePreview(imageDataURL, imgName, element, sRatio) // show preview panel
 			} else {
 				$('#imgData').attr("src", imageDataURL) // update image only
-				$('#downImgBtn').attr("onclick", "download('"+imgName+"', '"+imageDataURL+"')")
+				printPreviewSaveTo(imgName, imageDataURL)
 			}
+		}).catch(function (err) {
+			console.warn("image export failed:", err)
+			displayCalcNotification("The image could not be created", 2500)
 		});
 	}
 }
@@ -229,10 +331,14 @@ function trimCanvas(c) { // remove transparent pixels
 		}
 	}
 		
+	if (bound.top === null) return null // nothing was drawn
+
 	var trimHeight = bound.bottom - bound.top,
 			trimWidth = bound.right - bound.left,
 			trimmed = ctx.getImageData(bound.left, bound.top, trimWidth, trimHeight);
 	
+	if (trimWidth < 1 || trimHeight < 1) return null
+
 	copyCtx.canvas.width = trimWidth;
 	copyCtx.canvas.height = trimHeight;
 	copyCtx.putImageData(trimmed, 0, 0);
@@ -245,20 +351,67 @@ function trimCanvas(c) { // remove transparent pixels
 function showPrintImagePreview(imageDataURL, imgName, element, sRatio) {
 	$('<div id="darkOverlay" onclick="closePrintImagePreview()"></div>').appendTo('body'); // overlay
 
+	// The file name is built from the phrase, and a phrase can be anybody's -
+	// a published phrase, an imported file - so it never goes into markup or
+	// an onclick string. It used to: a phrase carrying &#39; was decoded back
+	// into a quote inside the attribute and ran as script on Save Image. The
+	// buttons get plain handlers that hold the values instead.
 	var o = '<div class="printImageContainer">'
 	o += '<center><div class="prevBtnArea">'
-	o += '<input id="downImgBtn" type="button" value="Save Image" onclick="download(&#39;'+imgName+'&#39;, &#39;'+imageDataURL+'&#39;)">' // &#39; - single quote
-	o += '<input class="refreshImgBtn" type="button" value="Refresh" onclick="openImageWindow(&#39;'+element+'&#39;, &#39;'+imgName+'&#39;, +&#39;'+sRatio+'&#39;, true);">'
+	o += '<input id="downImgBtn" type="button" value="Save Image">'
+	o += '<input class="refreshImgBtn" type="button" value="Refresh">'
 	o += '</div></center>'
-	o += '<div class="imgDataArea"><img id="imgData" src="'+imageDataURL+'"></div>'
+	o += '<div class="imgDataArea"><img id="imgData"></div>'
 	o += '</div>'
 
 	$(o).appendTo('body'); // preview image
+	$('#imgData').attr("src", imageDataURL)
+	printPreviewSaveTo(imgName, imageDataURL)
+	$('.refreshImgBtn').on("click", function () { openImageWindow(element, imgName, +sRatio, true) })
 	$('body').addClass('noScroll') // prevent scrolling
 
 	btnH = Math.ceil( $('.prevBtnArea').outerHeight() )
 	o = 'height: calc(100% - '+btnH+'px);'
 	$('.imgDataArea').attr("style", o)
+}
+
+// Save Image downloads this name and this image - set from here, never by
+// writing either into an attribute (see showPrintImagePreview).
+function printPreviewSaveTo(imgName, imageDataURL) {
+	$('#downImgBtn').off("click").on("click", function () { download(imgName, imageDataURL) })
+}
+
+// Shows a canvas in the print preview without going through html2canvas.
+//
+// Everything else here is HTML and has to be rasterised first, but a chart is
+// already pixels - re-rendering it would only lose sharpness. A canvas also
+// draws on transparency, so the page background is painted in behind it or the
+// saved PNG is unreadable on anything pale.
+//
+// `again` is the id of the button that produced it, so Refresh - which is
+// hard-wired to call openImageWindow - is repointed at that button instead.
+function printCanvasImage(cvs, imgName, again) {
+	if (!cvs || !cvs.width) return
+	var out = document.createElement("canvas")
+	var pad = Math.round(cvs.width * 0.03)
+	out.width = cvs.width + pad * 2
+	out.height = cvs.height + pad * 2
+
+	var c = out.getContext("2d")
+	c.fillStyle = window.getComputedStyle(document.body).getPropertyValue("background-color") || "#161a22"
+	c.fillRect(0, 0, out.width, out.height)
+	c.drawImage(cvs, pad, pad)
+
+	showPrintImagePreview(out.toDataURL("image/png"), imgName, "", 1)
+	if (again) {
+		$(".refreshImgBtn").off("click").on("click", function () {
+			closePrintImagePreview()
+			var b = document.getElementById(again)
+			if (b !== null) b.click()
+		})
+	} else {
+		$(".refreshImgBtn").remove() // nothing to refresh from
+	}
 }
 
 function closePrintImagePreview() {
@@ -362,10 +515,17 @@ function exportCiphersDB(expAllCiph = false) {
 				vArr_.push(cipherList[i].vArr[m])
 			}
 			
+			// JSON.stringify, not bare quotes. A cipher name containing a quote
+			// used to close the string and let the rest of the name continue as
+			// JavaScript in the eval() that read this file back — the round trip
+			// through export and import was itself an injection channel. The
+			// importer no longer evals, so this is now a correctness fix as well:
+			// a name with an apostrophe or quote in it survives the round trip
+			// instead of corrupting the whole block.
 			out +=
 				'\tnew cipher(\n'+
-				'\t\t"'+cipherList[i].cipherName+'",\n'+
-				'\t\t"'+cipherList[i].cipherCategory+'",\n'+
+				'\t\t'+JSON.stringify(String(cipherList[i].cipherName))+',\n'+
+				'\t\t'+JSON.stringify(String(cipherList[i].cipherCategory))+',\n'+
 				'\t\t'+cipherList[i].H+', '+cipherList[i].S+', '+cipherList[i].L+',\n'+
 				'\t\t'+JSON.stringify(cArr_)+',\n'+
 				'\t\t'+JSON.stringify(vArr_)+',\n'+
@@ -389,23 +549,33 @@ function exportCiphersDB(expAllCiph = false) {
 // a word, so no option restored at all, from localStorage, a synced workspace
 // or a preset. Only the cipher list came back.
 //
-// JSON.stringify escapes the inner quotes, so the entry survives the round
-// trip and eval() still sees a plain assignment.
+// JSON.stringify escapes the inner quotes, so the entry survives the round trip
+// and the importer's JSON.parse reads it back exactly.
+//
+// The last eval() in the application lived in this function. Its input was a
+// hardcoded array in calc.js, so it was never attacker-controlled — but "this
+// codebase contains no eval at all" is a property anyone can check in one grep,
+// whereas "the one eval is fine because of where its input comes from" stops
+// being true the day somebody adds a user-supplied entry to calcOptionsArr.
+// Reading the value off window produces byte-identical output.
 function exportCalcOptions() {
 	var o = "calcOptions = [\n\t"
-	for (var i = 0; i < calcOptionsArr.length; i++) {
-		o += JSON.stringify(String(eval(calcOptionsArr[i])))+",\n\t"
+	var names = calcOptionNames() // same list the importer checks against
+	for (var i = 0; i < names.length; i++) {
+		o += JSON.stringify(names[i] + " = " + JSON.stringify(window[names[i]]))+",\n\t"
 	}
 	o = o.slice(0,-3) + "\n]\n" // remove comma, new line, tab; new line, close array, new line
 	return o
 }
 
 function exportHighlighterMatches(histArr) { // highlighter mode controls export mode
-	if (histArr.length == 0) return
+	if (histArr.length == 0) { displayCalcNotification("The history table is empty", 2000); return }
 	if (optFiltCrossCipherMatch) {
 		exportCrossCipherMatches(histArr)
 	} else if (optFiltSameCipherMatch) {
 		exportSameCipherMatches(histArr)
+	} else {
+		displayCalcNotification("Turn on Cross or Same Cipher Match (Matches tab) first", 2600)
 	}
 }
 
@@ -456,6 +626,7 @@ function exportSameCipherMatches(histArr) {
 		}
 	}
 
+	if (o.indexOf('\n=====') === -1) { displayCalcNotification("No matches to export", 2000); return }
 	o = o.substring(0, o.length-3) // remove last new lines
 
 	o = 'data:text/plain;charset=utf-8,'+encodeURIComponent(o) // format as text file
@@ -512,6 +683,7 @@ function exportCrossCipherMatches(histArr) { // maybe use highlighter mode to co
 		}
 		o += '\n\n\n' // number added, new lines
 	}
+	if (searchArr.length === 0) { displayCalcNotification("No matches to export", 2000); return }
 	o = o.substring(0, o.length-3) // remove last new lines
 
 	o = 'data:text/plain;charset=utf-8,'+encodeURIComponent(o) // format as text file

@@ -38,7 +38,11 @@ var optCompactCiphCount = 8 // compact mode threshold
 var optLoadUserHistCiphers = true // load ciphers when CSV file is imported
 
 var optMatrixCodeRain = true // code rain
-var optCoderainFollowCipher = true // code rain borrows the hue of the active cipher
+// off by default: the rain stays the recognisable default green until the
+// user turns this on (or picks a colour) themselves - it used to default on,
+// which meant the first cipher the calculator auto-selected (before the user
+// had chosen anything) silently overrode the rain colour on every fresh load
+var optCoderainFollowCipher = false
 var optHistTableCaption = "" // caption shown in the History Table corner cell, used in exports
 var optNumerologyMode = false // show each value reduced to its digital root
 
@@ -81,8 +85,17 @@ var fontSatDefault = 0
 var fontLit = 1.0  // font lightness multiplier
 var fontLitDefault = 1.0
 
-var coderainHue = 148 // coderain hue
+var coderainHue = 148 // coderain hue - green, the recognisable default
 var coderainHueDefault = 148 // value for reset, updated on first run of updateCoderainHue()
+// The exact hue/sat/lit this project has shipped since its very first commit,
+// before "new"/"ccru"/"matrix" or any colour picker existed. Restored here
+// after a brief detour raising sat/lit for visibility - the actual reason the
+// rain read as washed-out grey was retro's canvas clearing to transparent
+// and showing the page's blue-grey background through it, not these values
+// being too weak; see matrixRetro() and coderainStyle above. Against retro's
+// now-solid black backdrop, the original numbers read as a proper glowing
+// green (matches a reference screenshot's sampled trail colour, #1F3B2B, to
+// within a few RGB units).
 var coderainSat = 0.2 // coderain saturation
 var coderainSatDefault = 0.2
 var coderainLit = 0.19  // coderain lightness
@@ -112,6 +125,8 @@ var calcOptionsArr = [ // used to export/import settings
 	"'optCoderainFollowCipher'+' = '+optCoderainFollowCipher",
 	"'optHistTableCaption'+' = '+JSON.stringify(optHistTableCaption)",
 	"'optNumerologyMode'+' = '+optNumerologyMode",
+	"'astroSystem'+' = '+JSON.stringify(astroSystem)",
+	"'astroViewMode'+' = '+JSON.stringify(astroViewMode)",
 	"'coderainStyle'+' = '+JSON.stringify(coderainStyle)",
 	"'coderainDensity'+' = '+coderainDensity",
 	"'coderainSpeedMul'+' = '+coderainSpeedMul",
@@ -136,11 +151,24 @@ var calcOptionsArr = [ // used to export/import settings
 	'"encDefAlphArr"+" = \x27"+String(encPrevAlphStr).replace(/,/g,"")+"\x27"',
 	'"encDefVowArr"+" = \x27"+String(encPrevVowStr).replace(/,/g,"")+"\x27"',
 	'"encDefExcLetArr"+" = \x27"+String(encPrevExcLetStr).replace(/,/g,"")+"\x27"',
-	"'optImageScale'+' = '+optImageScale"
+	"'optImageScale'+' = '+optImageScale",
+	"'optFocusShowWordSums'+' = '+optFocusShowWordSums",
+	"'optFocusShowBreakdown'+' = '+optFocusShowBreakdown",
+	"'optFocusShowCipherChart'+' = '+optFocusShowCipherChart",
+	"'optFocusShowHistoryTable'+' = '+optFocusShowHistoryTable"
 ]
 
 var runOnceRestoreCalcSet = true
-function initCalc(defSet = false) { // run after page has finished loading
+// keepSelection: the caller has just loaded a cipher selection of its own -
+// a preset, a saved workspace, an imported file - and it must survive this.
+//
+// enableDefaultCiphers() used to be harmless here: it read defaultCipherArray,
+// which initCiphers() had just rebuilt from whatever happened to be enabled,
+// so it re-enabled the very ciphers it found. Now that Default means the
+// built-in base-4 - which is what makes the Default button work after a preset
+// exists - this line genuinely resets the selection, and every restore path
+// was landing on Ordinal/Reduction/Reverse Ordinal/Reverse Reduction.
+function initCalc(defSet = false, keepSelection = false) { // run after page has finished loading
 	configureCalcInterface(true)
 	if (defSet && typeof calcOpt !== 'undefined') importCalcOptions(calcOptions); // load settings from ciphers.js
 	generateRndColors()
@@ -148,8 +176,9 @@ function initCalc(defSet = false) { // run after page has finished loading
 		runOnceRestoreCalcSet = false; restoreCalcSettingsLocalStorage(true); return; }
 	saveInitialCiphers()
 	initCiphers() // update default ciphers
+	document.getElementById("calcOptionsPanel").innerHTML = "" // clear menu panel - a signed-in workspace restore can build it before this first run, and the menus were drawn twice
 	createCalcMenus()
-	enableDefaultCiphers()
+	if (!keepSelection) enableDefaultCiphers()
 	saveCalcSettingsLocalStorage(true) // save default settings
 	showWelcomeMessage("Query To Search Database")
 }
@@ -165,7 +194,10 @@ function showWelcomeMessage(msg, durMs = 2500, delMs = 1250) {
 }
 
 function configureCalcInterface(initRun = false) { // switch interface layout (desktop or mobile devices)
-	if (optMatrixCodeRain && !initRun) { // update code rain
+	// initCodeRain() lives in coderain.js, which loads later in the page than
+	// this file - a resize event firing in that window (seen from a fresh tab
+	// straight after navigation) called this before that script had run.
+	if (optMatrixCodeRain && !initRun && typeof initCodeRain === "function") { // update code rain
 		clearInterval(code_rain) // reset previous instance
 		document.getElementById("canv").style.display = "none"
 		initCodeRain() // recalculate canvas size
@@ -202,12 +234,16 @@ window.addEventListener('resize', function(){ // update interface on window resi
 	}
 })
 
+// msg reaches here from several places that are not app-authored text -
+// most notably profileUsePhrase, which includes another member's
+// published phrase verbatim. Escaped before it ever touches .html(), same
+// as every other user-controlled string in this app.
 function displayCalcNotification(msg, timeMs = 1000) {
 	if (document.getElementById('calcNotification') !== null) {
 		document.getElementById('calcNotification').remove() }
 	var alertDiv = $('<div />').appendTo('body');
 	alertDiv.attr('id', 'calcNotification');
-	alertDiv.html("<span>"+msg+"</span>")
+	alertDiv.html("<span>"+escHtml(msg)+"</span>")
 	setTimeout(function() {alertDiv.remove()}, timeMs)
 }
 
@@ -215,8 +251,7 @@ function createCalcMenus() {
 	createCiphersMenu()
 	createOptionsMenu()
 	createFindMatchesMenu()
-	createDateCalcMenu()
-	createAstrologyMenu()
+	createFeaturesMenu()
 	createExportMenu()
 	createAboutMenu()
 	createProfileMenu()
@@ -231,6 +266,7 @@ function closeAllOpenedMenus() {
 	if (encodingMenuOpened) toggleEncodingMenu() // Encoding
 	if (typeof astroMenuOpened !== "undefined" && astroMenuOpened) toggleAstroMenu() // Astrology
 	if (typeof profileMenuOpened !== "undefined" && profileMenuOpened) toggleProfileMenu() // Profile
+	if (typeof masterDecoderMenuOpened !== "undefined" && masterDecoderMenuOpened) toggleMasterDecoderMenu() // Master Decoder
 }
 
 // ========================= Random Colors ==========================
@@ -256,11 +292,27 @@ function createCiphersMenu() { // create menu with all cipher categories
     o += '<input class="intBtn3" type="button" value="All" onclick="enableAllCiphers()">'
     o += '</center></div>'
 
+    // Search, under the filter row. With a couple of hundred ciphers across a
+    // dozen categories, finding one means knowing which category somebody
+    // filed it under - so typing searches across all of them at once.
+    o += '<div class="ciphSearchRow">'
+    o += '<input type="text" id="ciphSearchBox" class="ciphSearchBox" placeholder="Search cyphers…" autocomplete="off" spellcheck="false" oninput="ciphSearchInput()" onkeydown="ciphSearchKey(event)">'
+    o += '<span id="ciphSearchClear" class="ciphSearchClear hideValue" title="Clear the search" onclick="ciphSearchClear()">&#215;</span>'
+    o += '</div>'
+
     o += '<hr style="background-color: var(--separator-accent2); height: 1px; border: none; margin: 0.4em;">'
 
     o += '<div class="ciphCatCol">'
     for (i = 0; i < cCat.length; i++) {
         let category = cCat[i];
+        // A blank gap ahead of each of these two, marking where
+        // cipherCategoryOrder (ciphers.js) moves from the named "main
+        // branches" into the alphabetised group, and then into the
+        // language group - a fixed pair of category names is simpler and
+        // less fragile than trying to infer the boundary from list position.
+        if (category === "Elizabethan" || category === "Alphanumeric" || category === "Languages") {
+            o += '<div class="ciphCatDivider"></div>'
+        }
         // Apply 'gematriaClub' class only to the 'Gematria Club' category
         let extraClass = category === "Gematria Club" ? " gematriaClub" : "";
         // The category column is fixed width and the buttons do not wrap, so a
@@ -304,20 +356,167 @@ $(document).ready(function(){
 	});
 });
 
+// ---- cypher search ----------------------------------------------------
+//
+// Filters what the panel shows, and nothing else: cipherList is untouched, so
+// which ciphers are on is exactly what the Empty / Default / All buttons left
+// enabled. Those tick states show through the results, so the two work
+// together - search to find, tick to enable.
+//
+// A search spans every category rather than the open one. Typing "eng" to be
+// told there is no English Ordinal, because you happened to be looking at
+// Languages, would be worse than no search at all.
+
+var ciphSearchTerm = ""
+var ciphLastCat = null // the category to go back to when the search is cleared
+
+function ciphSearchInput() {
+	var box = document.getElementById("ciphSearchBox")
+	ciphSearchTerm = (box === null) ? "" : box.value.trim()
+	var x = document.getElementById("ciphSearchClear")
+	if (x !== null) x.classList.toggle("hideValue", ciphSearchTerm === "")
+	if (ciphSearchTerm === "") displayCipherCatDetailed(ciphLastCat || cCat[0])
+	else displayCipherSearch(ciphSearchTerm)
+}
+
+function ciphSearchClear() {
+	var box = document.getElementById("ciphSearchBox")
+	if (box !== null) { box.value = ""; box.focus() }
+	ciphSearchInput()
+}
+
+function ciphSearchKey(e) {
+	if (e.key === "Escape" || e.keyCode === 27) { ciphSearchClear(); e.preventDefault() }
+}
+
+// One row per matching cipher, in cipherList order, with the category it came
+// from beside the name - without it a flat list of two hundred names gives no
+// clue why "Reduction" appears three times.
+function displayCipherSearch(term) {
+	var q = String(term).toLowerCase()
+	var o = '<table class="cipherCatDetails"><tbody>'
+	var hits = 0
+
+	for (var i = 0; i < cipherList.length; i++) {
+		if (cipherList[i].cipherName.toLowerCase().indexOf(q) === -1) continue
+		hits++
+		var chk = cipherList[i].enabled ? " checked" : ""
+		o += '<tr><td><label class="chkLabel ciphCheckboxLabel2">'
+		o += ciphSearchMark(cipherList[i].cipherName, q)
+		o += '<span class="ciphSearchCat">' + cipherList[i].cipherCategory + '</span>'
+		o += '<input type="checkbox" id="cipher_chkbox' + i + '" onclick="toggleCipher(' + i + ')"' + chk + '><span class="custChkBox"></span></label></td></tr>'
+	}
+	o += '</tbody></table>'
+
+	if (hits === 0) {
+		o = '<div class="ciphSearchNone">No cypher matches &ldquo;' + escHtml(term) + '&rdquo;</div>'
+	}
+	document.getElementById("menuCiphCatDetailsArea").innerHTML = o
+}
+
+// the matched run in bold, so it is obvious why a name came back
+function ciphSearchMark(name, q) {
+	var i = name.toLowerCase().indexOf(q)
+	if (i < 0) return escHtml(name)
+	return escHtml(name.slice(0, i)) + '<b class="ciphSearchHit">' + escHtml(name.slice(i, i + q.length)) + '</b>' + escHtml(name.slice(i + q.length))
+}
+
+// Categories with a lead-in note and a few cyphers called out separately
+// below the main checkbox list, rather than left in the plain alphabetical
+// grid - keyed by category name so displayCipherCatDetailed() stays a single
+// render pass instead of growing another curCat === "X" branch per category
+// that wants this treatment.
+var cipherCatSpecial = {
+	"Elizabethan": {
+		note: "Archaic English from the 15-1600s:",
+		subNote: "Cyphers attributed to Francis Bacon:",
+		pinned: ["Bacon Kaye", "Modern Kaye"]
+	},
+	"CCRU": {
+		note: "Attributed to the CCRU during y2k:",
+		pinned: ["Standard", "Synx"],
+		// one short note per pinned cypher instead of a shared subNote, each
+		// directly above its own checkbox
+		pinnedNotes: {
+			"Standard": "Historical english gematria cipher:",
+			"Synx": "Modern cipher, discovered in 2024:"
+		}
+	}
+}
+
+// Shorter labels for the Cyphers menu list only.
+//
+// The list is a narrow column, so a long name wraps onto two or three lines
+// and the row stops scanning as one item. Everywhere the cypher is actually
+// doing something - the results table, the word breakdown, the chart, exports,
+// saved settings - keeps the full name, because that is where knowing exactly
+// which cypher produced a number matters.
+//
+// Keyed on the real cipherName, which is what the rest of the app stores and
+// matches on; nothing here changes a cypher's identity.
+// Only names that actually overflow the column belong here. "Based
+// Atlanteanism" fits on one line as it is, so it keeps its full name and only
+// the longer one is abbreviated.
+var cipherListingNames = {
+	"Based Atlanteanism Denovated": "BA Denovated"
+}
+
+function cipherListingName(name) {
+	var short = cipherListingNames[name]
+	return (short === undefined) ? name : short
+}
+
+function cipherCheckboxRow(i) {
+	var chk = cipherList[i].enabled ? " checked" : ""
+	return '<tr><td><label class="chkLabel ciphCheckboxLabel2" title="'+cipherList[i].cipherName+'">'+cipherListingName(cipherList[i].cipherName)+'<input type="checkbox" id="cipher_chkbox'+i+'" onclick="toggleCipher('+i+')"'+chk+'><span class="custChkBox"></span></label></td></tr>'
+}
+
 function displayCipherCatDetailed(curCat) {
-	var chk = ""; var o = ""
+	ciphLastCat = curCat
+	// a category click is a deliberate move away from the search results
+	if (ciphSearchTerm !== "") {
+		var sb = document.getElementById("ciphSearchBox")
+		if (sb !== null) sb.value = ""
+		ciphSearchTerm = ""
+		var sx = document.getElementById("ciphSearchClear")
+		if (sx !== null) sx.classList.add("hideValue")
+	}
+	var o = ""
+	var special = cipherCatSpecial[curCat]
 	if (navigator.maxTouchPoints > 1) {
 		o += '<input class="intBtn3" type="button" value="Toggle Category" style="width: 100%; margin-top: 0.1em" onclick="toggleCipherCategory(&quot;'+curCat+'&quot;)">'
 		o += '<div style="padding: 0.25em;"></div>'
 	}
+	if (special) o += '<div class="ciphCatNote">' + special.note + '</div>'
+
 	o += '<table class="cipherCatDetails"><tbody>'
 	for (i = 0; i < cipherList.length; i++) {
-		if (cipherList[i].cipherCategory == curCat) {
-			if (cipherList[i].enabled) {chk = " checked";} else {chk = ""} // checkbox state
-			o += '<tr><td><label class="chkLabel ciphCheckboxLabel2">'+cipherList[i].cipherName+'<input type="checkbox" id="cipher_chkbox'+i+'" onclick="toggleCipher('+i+')"'+chk+'><span class="custChkBox"></span></label></td>'
+		if (cipherList[i].cipherCategory == curCat && !(special && special.pinned.indexOf(cipherList[i].cipherName) !== -1)) {
+			o += cipherCheckboxRow(i)
 		}
 	}
 	o += '</tbody></table>'
+
+	if (special && special.pinnedNotes) {
+		// each pinned cypher gets its own short note directly above its own
+		// checkbox, rather than one note shared across all of them
+		for (var p = 0; p < special.pinned.length; p++) {
+			var name = special.pinned[p]
+			var idx = cipherList.findIndex(function (c) { return c.cipherCategory === curCat && c.cipherName === name })
+			if (idx === -1) continue
+			if (special.pinnedNotes[name]) o += '<div class="ciphCatNote">' + special.pinnedNotes[name] + '</div>'
+			o += '<table class="cipherCatDetails"><tbody>' + cipherCheckboxRow(idx) + '</tbody></table>'
+		}
+	} else if (special && special.subNote) {
+		o += '<div class="ciphCatNote">' + special.subNote + '</div>'
+		o += '<table class="cipherCatDetails"><tbody>'
+		for (var p = 0; p < special.pinned.length; p++) {
+			var idx = cipherList.findIndex(function (c) { return c.cipherCategory === curCat && c.cipherName === special.pinned[p] })
+			if (idx !== -1) o += cipherCheckboxRow(idx)
+		}
+		o += '</tbody></table>'
+	}
+
 	document.getElementById("menuCiphCatDetailsArea").innerHTML = o
 }
 
@@ -334,90 +533,111 @@ function createAboutMenu() { // create menu with all cipher catergories
 	// o += '</center>'
 	// o += '<div style="margin: 1em;"></div>'
 	
-	// Credit line, not a link: Gematro took their site down, so this is plain
-	// text at the top rather than a button that leads nowhere.
-	o += '<div class="aboutCredit"><b>Coded by Gematro in 2021</b></div>'
-
+	// Top of the menu: the things somebody actually looking for help wants
+	// first, rather than making them scroll past credits and repo links.
 	o += '<input class="intBtn" type="button" value="&#9989; Quickstart Guide" onclick="displayQuickstartGuide()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	// U+1F4E7, not U+2709: the latter is a text-presentation glyph and falls
-	// back to a tofu box wherever the font has no colour emoji for it
-	o += '<input class="intBtn" type="button" value="&#128231; Contact Us" onclick="displayContactPanel()">'
+	o += '<input class="intBtn" type="button" value="&#128214; Cyphers (Info)" onclick="displayCyphersInfoPanel()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	// Sits right under Cyphers (Info) rather than in Account - a menu anyone
+	// can find, member or not, instead of buried a login and a tab away.
+	o += '<input class="intBtn" type="button" value="&#127891; Guided Tour" onclick="tourRestart()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	// U+1F4AC (speech balloon): a "get in touch" glyph reads better here than
+	// the envelope, which now sits on Cyphers Discord instead
+	o += '<input class="intBtn" type="button" value="&#128172; Contact Us" onclick="displayContactPanel()">'
+
+	o += '<div class="aboutGroupLabel">Check out co-founder sites</div>'
+	o += '<input class="intBtn" type="button" value="&#128154; Ciphers News" onclick="gotoCiphersNews()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="&#128218; Gematria Research" onclick="gotoAlektryonBlog()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="&#127932; PHYTHAGRAM" onclick="gotoPhythagram()">'
+	o += '<div style="margin: 0.5em;"></div>'
+
+	// The credit sits down here as plain text rather than up top, because
+	// Gematro took their site down and a button that leads nowhere is worse
+	// than none - it opens a panel instead of a link, so the credit still has
+	// somewhere to say who wrote this and where to reach him.
+	//
+	// Collapsible the same way "Visit other calculators" below is (native
+	// <details>, no JS) rather than a plain list under a label - four repo
+	// links are exactly the kind of thing worth tucking away by default too.
+	o += '<details class="qgAcc"><summary>Github Repos</summary><div class="qgAccBody">'
+	o += '<input class="intBtn" type="button" value="Coded by Gematro in 2021" onclick="displayGematroCredit()">'
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input class="intBtn" type="button" value="Alektryon Github 2021" onclick="gotoAlektryonRepo()">'
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input class="intBtn" type="button" value="Cyphers Github 2022" onclick="gotoCyphersRepo()">'
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input class="intBtn" type="button" value="Hyperdope Github 2023" onclick="gotoGitHubRepo()">'
-	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="&#128218; Gematria Research" onclick="gotoAlektryonBlog()">'
-	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="&#128154; Ciphers News" onclick="gotoCiphersNews()">'
-	o += '<div style="margin: 0.5em;"></div>'
+	o += '</div></details>'
+
+	o += '<div class="aboutGroupLabel">Find us on social media:</div>'
 	o += '<input class="intBtn" type="button" value="&#127916; Cyphers Youtube" onclick="gotoCyphersYoutube()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="&#128172; Cyphers Discord" onclick="gotoDiscordServer()">'
+	// U+1F4BB (laptop): the speech balloon that used to be here now marks
+	// Contact Us instead
+	o += '<input class="intBtn" type="button" value="&#128187; Cyphers Discord" onclick="gotoDiscordServer()">'
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input class="intBtn" type="button" value="&#128241; Cyphers Twitter / X" onclick="gotoX()">'
-	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="&#128229; Cyphers Database" onclick="gotoDatabase()">'
-	o += '<div style="margin: 0.5em;"></div>'
+
+	// Everything below is somebody else's calculator - collapsed by default
+	// (native <details>, no JS needed to expand it) so six more buttons don't
+	// add to the length of the list for someone who came here for Cyphers'
+	// own links above, not a directory of other sites.
+	o += '<details class="qgAcc"><summary>Visit other calcs</summary><div class="qgAccBody">'
 	o += '<input class="intBtn" type="button" value="Alektryon Calculator" onclick="gotoAlektryonCalculator()">'
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input class="intBtn" type="button" value="Based Atlanteanism" onclick="gotoBasedAtlantis()">'
 	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Geomatria Calc" onclick="gotoGeomatria()">'
+	o += '<input class="intBtn" type="button" value="Doomcrypt Subdecadence" onclick="gotoDoomcryptSubdecadence()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="Geomatria Calculator" onclick="gotoGeomatria()">'
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input class="intBtn" type="button" value="Gematrinator Calculator" onclick="gotoGEMATRINATOR()">'
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input class="intBtn" type="button" value="Qliphoth Calculator" onclick="gotoQliphoth()">'
-	o += '<div style="margin: 0.5em;"></div>'
-	o += '<input class="intBtn" type="button" value="Cyphers Net Void" onclick="gotoNetVoid()">'
-	o += '<div style="margin: 0.5em;"></div>'
-	
-
-
-	// o += '<div style="margin: 0.5em;"></div>'
-	// o += '<input class="intBtn" type="button" value="Contacts" onclick="displayContactInfo()">'
+	o += '</div></details>'
 
 	o += '</div></div>'
 
 	document.getElementById("calcOptionsPanel").innerHTML = o
 }
 
-function gotoCyphersRepo() { window.open("https://github.com/CyphersNews/gematro-hyperdope", "_blank") }
+function gotoCyphersRepo() { window.open("https://github.com/CyphersNews/gematro-hyperdope", "_blank", "noopener") }
 
-function gotoGitHubRepo() { window.open("https://github.com/malonehunter/hyperdope-gematria", "_blank") }
+function gotoGitHubRepo() { window.open("https://github.com/malonehunter/hyperdope-gematria", "_blank", "noopener") }
 
-function gotoAlektryonBlog () {window.open("https://gematriaresearch.blogspot.com/", "_blank") }
+function gotoAlektryonBlog () {window.open("https://gematriaresearch.blogspot.com/", "_blank", "noopener") }
 
-function gotoAlektryonCalculator() { window.open("https://alektryon.github.io/gematria/", "_blank") }
+function gotoAlektryonCalculator() { window.open("https://alektryon.github.io/gematria/", "_blank", "noopener") }
 
-function gotoAlektryonRepo() { window.open("https://github.com/Alektryon/gematria", "_blank") }
+function gotoAlektryonRepo() { window.open("https://github.com/Alektryon/gematria", "_blank", "noopener") }
 
-function gotoBasedAtlantis() { window.open("https://basedatlantis.neocities.org/", "_blank") }
+function gotoBasedAtlantis() { window.open("https://basedatlantis.neocities.org/", "_blank", "noopener") }
 
-function gotoGeomatria() { window.open("https://resonatingloop.github.io/geomatria/", "_blank") }
+function gotoGeomatria() { window.open("https://resonatingloop.github.io/geomatria/", "_blank", "noopener") }
 
-function gotoQliphoth() { window.open("https://qliphoth.systems/", "_blank") }
+function gotoQliphoth() { window.open("https://qliphoth.systems/", "_blank", "noopener") }
 
-function gotoCiphersNews () {window.open("https://ciphers.news", "_blank") }
+function gotoCiphersNews () {window.open("https://ciphers.news", "_blank", "noopener") }
 
-function gotoCyphersYoutube() { window.open("https://www.youtube.com/channel/UCg2_MXc1Q8AajN_n9kqIltQ", "_blank") }
+function gotoPhythagram() { window.open("https://phythagram.com/", "_blank", "noopener") }
 
-function gotoDiscordServer() { window.open("https://discord.gg/SJjN64x3h7", "_blank") }
+function gotoCyphersYoutube() { window.open("https://www.youtube.com/channel/UCg2_MXc1Q8AajN_n9kqIltQ", "_blank", "noopener") }
 
-function gotoX() { window.open("https://twitter.com/CyphersNews", "_blank") }
+function gotoDiscordServer() { window.open("https://discord.gg/SJjN64x3h7", "_blank", "noopener") }
 
-function gotoDatabase () {window.open("https://www.netvoid.tv/gematria", "_blank") }
+function gotoX() { window.open("https://twitter.com/CyphersNews", "_blank", "noopener") }
 
-function gotoGematroCalculator() { window.open("https://gematro.github.io/", "_blank") }
+function gotoGematroCalculator() { window.open("https://gematro.github.io/", "_blank", "noopener") }
 
-function gotoHyperdopeBlog () {window.open("https://calc.hyperdope.com/", "_blank") }
+function gotoHyperdopeBlog () {window.open("https://calc.hyperdope.com/", "_blank", "noopener") }
 
-function gotoGEMATRINATOR () {window.open("https://gematrinator.com/", "_blank") }
+function gotoGEMATRINATOR () {window.open("https://gematrinator.com/", "_blank", "noopener") }
 
-function gotoNetVoid () {window.open("https://www.youtube.com/@NetVoid/featured", "_blank") }
+function gotoDoomcryptSubdecadence() { window.open("https://doomcrypt.github.io/subdecadence/", "_blank", "noopener") }
 
 
 
@@ -427,6 +647,81 @@ function gotoNetVoid () {window.open("https://www.youtube.com/@NetVoid/featured"
 
 function gematroSvgLogo() {
 	return '<svg xmlns="http://www.w3.org/2000/svg" width="802.4" height="76.4" viewBox="0 0 2006 191"><defs><style>.cls-1 {fill: #bababa;fill-rule: evenodd;}</style></defs><path id="gematro_svg" data-name="gematroSVG" class="cls-1" d="M192.556,55.8L238,56l0.143-12.972q0-24.223-10.351-33.474T188.592,0.3H50.512q-29.07,0-39.31,9.47T0.961,45.23V145.873q0,26.21,10.24,35.676t39.31,9.47h138.08q29.07,0,39.31-9.47t10.241-35.676V80.026H116.8V113.94h75.757v40.522H47.429V35.32H192.556V55.8Zm332.1,135.218V155.343h-160.1V108.435h91.833V75.621H364.552V34h157.68V0.3H317.644V191.019H524.655Zm104.386,0V62.848l86.328,105.268h9.03L809.625,59.765V191.019h43.164V0.3H815.351L722.417,113.5,629.041,0.3H591.823V191.019h37.218Zm326.153,0,24-41.843H1105.39l24,41.843h52.19L1066.63,0.3h-44.71L908.726,191.019h46.468ZM1041.96,34.88l44.49,79.5H999.018Zm368.44-.44V0.3H1179.6V34.439h92.06v156.58h46.46V34.439h92.28Zm228.7,2.2q4.515,3.525,4.52,11.892V70.556q0,8.372-4.52,11.892t-16.63,3.524H1516.33V33.118h106.14Q1634.59,33.118,1639.1,36.642ZM1516.33,191.019V118.785h43.82l79.94,72.234h66.73l-90.73-72.234h26.2q23.565,0,34.14-8.588T1687,82.228V37.3q0-19.6-10.57-28.3t-34.14-8.7H1470.52V191.019h45.81Zm289.15-155.7H1959.2V154.462H1805.48V35.32Zm-46.47,110.553q0,26.21,10.13,35.676t39.42,9.47h147.55q29.07,0,39.31-9.47t10.24-35.676V45.23q0-25.983-10.02-35.456T1956.11,0.3H1808.56q-29.28,0-39.42,9.47T1759.01,45.23V145.873Z"/></svg>'
+}
+
+// =========================== Focus Mode ============================
+//
+// A lot of shares of this calculator turn out to just be a plain screenshot
+// of the page as it stands, nav row and phrase box included - not the
+// dedicated PNG export. Rather than fighting that, this hides the
+// persistent chrome (the nav row and the phrase box) so that screenshot is
+// already clean by the time someone takes it. Nothing is deleted or reset -
+// #focusModeBtn (index.html) toggles one class on <body>, everything else
+// still exists underneath and reappears exactly as it was.
+function toggleFocusMode() {
+	document.body.classList.toggle("focusMode")
+	var on = document.body.classList.contains("focusMode")
+	applyFocusModeVisibility()
+	// #focusOptionsBtn only shows while focus mode is on (styles.css), so its
+	// panel would otherwise be left stranded, open, with no way to close it.
+	if (!on) {
+		var panel = document.getElementById("focusOptionsPanel")
+		if (panel !== null) panel.remove()
+	}
+	var btn = document.getElementById("focusModeBtn")
+	if (btn === null) return
+	btn.title = on ? "Exit focus mode" : "Focus mode: hide the menu and phrase box for a clean screenshot (tap again to restore)"
+	btn.setAttribute("aria-pressed", on ? "true" : "false")
+}
+
+// What appears in Focus Mode, besides the enabled-cyphers badges and the
+// letter/word count, which are always hidden there. These are ordinary
+// calcOptionsArr entries (see the array near the top of this file), so they
+// save to localStorage, a synced workspace, and any named preset exactly
+// like every other option - no extra plumbing needed to make them "part of
+// the preset save".
+//
+// "Word sums" is the equation line - "phrase = total (cipher)" - not the
+// in-grid per-word totals (52, 71, 37), which live under "Breakdown"
+// instead, along with the letters, their values, and the grid's own total.
+var optFocusShowWordSums = false
+var optFocusShowBreakdown = false
+var optFocusShowCipherChart = true
+var optFocusShowHistoryTable = true
+
+// Re-applied on every checkbox change, and whenever Focus Mode itself is
+// turned on - the focusHide* classes only do anything combined with
+// body.focusMode (styles.css), so calling this while focus mode is off is
+// harmless and keeps the two from ever getting out of sync.
+function applyFocusModeVisibility() {
+	document.body.classList.toggle("focusHideWordSums", !optFocusShowWordSums)
+	document.body.classList.toggle("focusHideBreakdown", !optFocusShowBreakdown)
+	document.body.classList.toggle("focusHideCipherChart", !optFocusShowCipherChart)
+	document.body.classList.toggle("focusHideHistoryTable", !optFocusShowHistoryTable)
+}
+
+function focusOptionSet(varName, checked) {
+	window[varName] = checked
+	applyFocusModeVisibility()
+}
+
+function focusOptionRow(label, varName, checked) {
+	return '<label class="chkLabel focusOptionRow">'+label+'<input type="checkbox" onchange="focusOptionSet(&quot;'+varName+'&quot;, this.checked)"'+(checked ? ' checked' : '')+'><span class="custChkBox"></span></label>'
+}
+
+function toggleFocusOptionsPanel() {
+	var existing = document.getElementById("focusOptionsPanel")
+	if (existing !== null) { existing.remove(); return }
+
+	var o = '<div id="focusOptionsPanel" class="focusOptionsPanel">'
+	o += '<div class="focusOptionsTitle">Show in Focus Mode</div>'
+	o += focusOptionRow("Word sums", "optFocusShowWordSums", optFocusShowWordSums)
+	o += focusOptionRow("Breakdown", "optFocusShowBreakdown", optFocusShowBreakdown)
+	o += focusOptionRow("Cipher chart", "optFocusShowCipherChart", optFocusShowCipherChart)
+	o += focusOptionRow("History table", "optFocusShowHistoryTable", optFocusShowHistoryTable)
+	o += '</div>'
+
+	$(o).appendTo('body')
 }
 
 // ========================= Options Menu ===========================
@@ -830,6 +1125,8 @@ function createExportMenu() {
 	o += '<input id="btn-num-props-png" class="intBtn" type="button" value="Print Number Properties">' // print number properties
 	o += '<div style="margin: 0.5em;"></div>'
 	o += '<input id="btn-date-calc-png" class="intBtn" type="button" value="Print Date Durations">' // print date durations
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input id="btn-astro-chart-png" class="intBtn" type="button" value="Print Astrology Chart">' // print the natal chart
 
 	o += '<div class="enterAsWordsLimit"><span class="optionTableLabel">Image scale</span><input id="iScaleBox" onchange="conf_iScale()" type="text" value="'+optImageScale.toFixed(1)+'"></div>' // image scale
 	
@@ -868,7 +1165,17 @@ function createExportMenu() {
 }
 function conf_iScale() { // image scale
 	var element = document.getElementById("iScaleBox")
-	optImageScale = Number(Number(element.value).toFixed(1)) // 1.0
+	var v = Number(Number(element.value).toFixed(1)) // 1.0
+	// not a number, zero or negative would hand html2canvas a scale it cannot
+	// draw at - keep the last good value and show it again
+	if (!(v > 0) || v > 5) { element.value = optImageScale.toFixed(1); return }
+	optImageScale = v
+}
+// The HTML exports (charts, tables, breakdowns, card, dates) have always been
+// drawn at 2x. The Image scale box multiplies that, so its default of 1.0
+// leaves them exactly as they were - before, it only reached Number Properties.
+function exportImageScale() {
+	return 2.0 * ((optImageScale > 0) ? optImageScale : 1)
 }
 
 // ========================= Color Functions ========================
@@ -886,8 +1193,13 @@ function createFindMatchesMenu() {
 	if (optShowOnlyMatching) SOMstate = "checked"
 
 	o += '<div class="dropdown">'
-	o += '<button class="dropbtn findMatchesTab" onclick="findMatchesFlash(this);updateHistoryTableAutoHlt()"><span class="labFull">Find Matches</span><span class="labShort">Match</span></button>'
+	o += '<button class="dropbtn findMatchesTab" onclick="findMatchesFlash(this);updateHistoryTableAutoHlt()"><span class="labFull">Matches</span><span class="labShort">Matches</span></button>'
 	o += '<div class="dropdown-content" style="width: 210px; left: -55px;">'
+
+	// Hovering the tab is what opens this panel, which then sits right over
+	// where a CSS-only hover tooltip on the button itself would have appeared -
+	// so the instruction has to live in here instead, not on the button.
+	o += '<div class="findMatchesHint">Click to Find Matches &#8593;</div>'
 
 	// no Find Matches button here, the tab itself runs the search
 	o += '<input class="intBtn" type="button" value="Reset Order" onclick="clearHistMatchSort()">'
@@ -924,11 +1236,20 @@ function createBgToggleButton() {
 	updateCodeRainToggleBtn() // applies the state class and tooltip
 }
 
-// Date Calculator as its own tab rather than an entry inside Features
-function createDateCalcMenu() {
+// Date Calc and Astro, one nav slot instead of two - both are occasional
+// tools next to the calculator's everyday tabs, not things reached for on
+// every visit, so a dropdown suits them better than a tab each.
+function createFeaturesMenu() {
 	var o = document.getElementById("calcOptionsPanel").innerHTML
 	o += '<div class="dropdown">'
-	o += '<button class="dropbtn dateCalcTab" onclick="toggleDateCalcMenu()"><span class="labFull">Date Calculator</span><span class="labShort">Date Calc</span></button>'
+	o += '<button class="dropbtn">Features</button>'
+	o += '<div class="dropdown-content">'
+	o += '<input class="intBtn" type="button" value="&#128197; Date Calc" onclick="toggleDateCalcMenu()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="&#127756; Astrology" onclick="toggleAstroMenu()">'
+	o += '<div style="margin: 0.5em;"></div>'
+	o += '<input class="intBtn" type="button" value="&#128377;&#65039; Master Decoder" onclick="toggleMasterDecoderMenu()">'
+	o += '</div>'
 	o += '</div>'
 	document.getElementById("calcOptionsPanel").innerHTML = o
 }
@@ -954,14 +1275,6 @@ function createAuthNavArea() {
 	document.getElementById("calcOptionsPanel").innerHTML = o
 	if (typeof histSyncStatusEl !== "undefined") histSyncStatusEl = null // re-resolve after rebuild
 	if (typeof renderAuthNav === "function") renderAuthNav()
-}
-
-function createAstrologyMenu() {
-	var o = document.getElementById("calcOptionsPanel").innerHTML
-	o += '<div class="dropdown">'
-	o += '<button class="dropbtn dateCalcTab" onclick="toggleAstroMenu()"><span class="labFull">Astrology</span><span class="labShort">Astro</span></button>'
-	o += '</div>'
-	document.getElementById("calcOptionsPanel").innerHTML = o
 }
 
 function create_PL() { // Phrase Limit (End)
@@ -1444,10 +1757,16 @@ function enableAllCiphers() {
 	updateTables() // update
 }
 
+// The Cryptography ciphers are built on the English alphabet, so they answer to
+// the same lowercase-"a" test as everything else here - but they substitute
+// symbols rather than adding numbers up, so a run of them among the English
+// totals is a column of glyphs with nothing to compare. They are picked
+// deliberately from their own category instead.
 function enableAllEnglishCiphers() {
 	prevCiphIndex = -1 // reset cipher selection
 	var cur_chkbox
 	for (i = 0; i < cipherList.length; i++) {
+		if (cipherList[i].cipherCategory == "Cryptography") continue
 		if (cipherList[i].cipherCategory == "Extra" && optShowExtraCiphers && cipherList[i].cArr.indexOf(97) > -1) { // lowercase "a", "Extra" English ciphers only if allowed
 			cur_chkbox = document.getElementById("cipher_chkbox"+i)
 			cipherList[i].enabled = true
@@ -1827,14 +2146,33 @@ function updateHistoryTable(hltBoolArr) {
 			// Left empty when unnamed. The corner cell is part of the table's
 			// shape, not a place for instructions - the right-click menu is where
 			// the feature is announced.
-			ms += '<tr class="cH"><td class="mP" title="Click to name this table">'+escHtml(optHistTableCaption)+'</td>'
+			//
+			// histRow gives this the same far-right hover/focus x the phrase
+			// rows have (see .histDelX in styles.css), but for the whole table -
+			// only on the first header, xi===0, so a long table never scatters
+			// several "delete everything" controls through it. .mP already has
+			// its own tap target (rename the table) that replaces its content
+			// outright, so the tabindex and the x live on the first cipher
+			// header cell instead, not the corner.
+			var showClearAll = (xi === 0)
+			var clearAllDone = false
+			ms += '<tr class="cH histRow"><td class="mP" title="Click to name this table">'+escHtml(optHistTableCaption)+'</td>'
 			for (z = 0; z < cipherList.length; z++) {
 				if (cipherList[z].enabled && ciphShown(cipherList[z].cipherName)) {
 					curCiphCol = (optColoredCiphers) ? 'color: hsl('+cipherList[z].H+' '+cipherList[z].S+'% '+cipherList[z].L+'% / 1);' : ''
+					var tabAttr = ""
+					var clearClass = ""
+					var clearBtn = ""
+					if (showClearAll && !clearAllDone) {
+						tabAttr = ' tabindex="0"'
+						clearClass = " histClearTab"
+						clearBtn = '<button type="button" class="histDelX" aria-label="Delete the whole history table" title="Delete the whole history table" onclick="histClearAllBtnClick(this)">&times;</button>'
+						clearAllDone = true
+					}
 					if (compactHistoryTable) {
-						ms += '<td class="hCV" style="height: '+calcCipherNameHeightPx(cipherList[z].cipherName)+'px;"><span class="hCV2" style="'+curCiphCol+'">'+cipherList[z].cipherName+'</span></td>' // color of cipher displayed in the table
+						ms += '<td class="hCV'+clearClass+'"'+tabAttr+' style="height: '+calcCipherNameHeightPx(cipherList[z].cipherName)+'px;"><span class="hCV2" style="'+curCiphCol+'">'+cipherList[z].cipherName+'</span>'+clearBtn+'</td>' // color of cipher displayed in the table
 					} else {
-						ms += '<td class="hC" style="'+curCiphCol+' max-width: '+calcCipherNameWidthPx(cipherList[z].cipherName)+'px; min-width: '+calcCipherNameWidthPx(cipherList[z].cipherName)+'px;">'+cipherList[z].cipherName+'</td>' // color of cipher displayed in the table
+						ms += '<td class="hC'+clearClass+'"'+tabAttr+' style="'+curCiphCol+' max-width: '+calcCipherNameWidthPx(cipherList[z].cipherName)+'px; min-width: '+calcCipherNameWidthPx(cipherList[z].cipherName)+'px;">'+cipherList[z].cipherName+clearBtn+'</td>' // color of cipher displayed in the table
 					}
 				}
 			}
@@ -1850,11 +2188,22 @@ function updateHistoryTable(hltBoolArr) {
 				tmpComment = commentMatch[0]
 			}
 			// comment first, phrase without comment and leading/trailing spaces
-			dispPhrase = '<span class="pCHT">'+tmpComment+'</span>' + sHistory[x].replace(/\[.+\]/g, '').trim()
+			dispPhrase = '<span class="pCHT">'+escHtml(tmpComment)+'</span>' + escHtml(sHistory[x].replace(/\[.+\]/g, '').trim())
 		} else {
-			dispPhrase = sHistory[x]
+			dispPhrase = escHtml(sHistory[x])
 		}
-		ms += '<tr><td class="hP" data-ind="'+x+'">' + dispPhrase + '</td>' // hP - history phrase, add data index
+		// histDelX sits inside .hP rather than .hP itself being positioned, so
+		// its position:absolute skips .hP (left position:static) and resolves
+		// against .histRow below instead - true top-right corner of the row,
+		// not just of the phrase cell, without adding a column for it.
+		//
+		// tabindex makes .hP a tap target in its own right: mobile has no
+		// hover, so :focus-within is what reveals the × there - tapping the
+		// entry focuses it, tapping elsewhere moves focus off and hides it
+		// again. The same tabindex is what lets a keyboard Tab to it too.
+		ms += '<tr class="histRow"><td class="hP" data-ind="'+x+'" tabindex="0">' + dispPhrase
+		ms += '<button type="button" class="histDelX" aria-label="Delete this phrase" title="Delete this phrase" onclick="histDeleteBtnClick(this, '+x+')">&times;</button>'
+		ms += '</td>' // hP - history phrase, add data index
 		var col = "" // value color
 
 		for (y = 0; y < cipherList.length; y++) {
@@ -1906,4 +2255,34 @@ function updateHistoryTable(hltBoolArr) {
 
 	ms += '</tbody></table>'
 	histTable.innerHTML = ms
+}
+
+// Row-level delete for the History Table's × (see updateHistoryTable()). Same
+// removal Shift+Click on the phrase cell already does - this only adds a tap
+// target that does not depend on a keyboard modifier or a mouse hover, so it
+// also works on a phone (via Edit mode) and reaches the same control via Tab.
+// profileConfirmClick() (profile-tab.js) arms the button on the first tap and
+// only deletes on the second, so a stray tap or click cannot delete a phrase
+// by accident.
+function histDeleteBtnClick(btn, ind) {
+	if (typeof profileConfirmClick === "function" && !profileConfirmClick(btn, "Sure?")) return
+	if (sHistory.length == 1) {
+		sHistory = [] // reinitialize array if there is only one entry
+		var tArea = document.getElementById("HistoryTableArea")
+		if (tArea !== null) tArea.innerHTML = "" // clear table
+		updateTables()
+		return
+	}
+	sHistory.splice(ind, 1)
+	updateTables()
+}
+
+// Whole-table equivalent of histDeleteBtnClick() - same far-right hover/focus
+// x, same arm-then-confirm, but on the header row (see updateHistoryTable())
+// and wired to the app's own "clear everything" path rather than removing one
+// phrase, so this behaves identically to the Home key or the right-click
+// menu's "Clear History Table", just reachable the same way the per-row x is.
+function histClearAllBtnClick(btn) {
+	if (typeof profileConfirmClick === "function" && !profileConfirmClick(btn, "Sure?")) return
+	phraseBoxKeypress(36) // "Home" keystroke - the app's own clear-history path
 }

@@ -1,12 +1,22 @@
 // ================ Code rain (HTML5 canvas) =================
 //
-// Two styles share this canvas:
-//   "new"   - multi-script glyph rain, subtle, colour follows the active cipher
-//   "retro" - the original upstream matrix rain, kept verbatim in behaviour
+// Four styles share this canvas:
+//   "matrix" - the film's white-headed green columns on solid black. The default.
+//   "new"    - multi-script glyph rain, subtle, blends with the page background.
+//              Displayed to the user as "Decode".
+//   "retro"  - the original upstream matrix rain: solid near-black backdrop,
+//              matrix-font glyphs, coderainHue/Sat/Lit for colour.
+//   "ccru"   - dense neon grid, its own committed palette
 // optMatrixCodeRain is the on/off switch (themes still set it); coderainStyle
-// picks which of the two runs. The nav button cycles Off -> On -> Retro.
+// picks which style runs. The nav button cycles Matrix -> Off -> Decode ->
+// Retro -> CCRU -> back to Matrix.
 
-var coderainStyle = "new" // "new" or "retro"
+// "matrix" by default: it is what a fresh visitor and a fresh login now see
+// first. coderainHue/Sat/Lit (calc.js) are shared by every style and by the
+// Color Controls / rain-colour-picker sliders - retro reads them directly, so
+// the slider still controls that style even though it is no longer the one
+// shown on arrival.
+var coderainStyle = "matrix" // "matrix", "new" ("Decode"), "retro" or "ccru"
 
 // ---- glyph pool (new style) -------------------------------------------
 
@@ -95,6 +105,63 @@ function buildCodeRainGlyphs() {
 	}
 }
 
+// ---- the film's alphabet ----------------------------------------------
+//
+// The title sequence is half-width katakana with a scattering of digits and a
+// few latin capitals, and the whole field is mirrored - which is why the
+// katakana never quite read as katakana. matrixFilm() does the mirroring with
+// one transform for the frame rather than per glyph.
+
+var coderainFilmGlyphs = []
+
+function buildFilmGlyphs() {
+	if (coderainFilmGlyphs.length) return
+
+	var cvs = document.createElement("canvas")
+	cvs.width = 22; cvs.height = 22
+	var probe = cvs.getContext("2d", { willReadFrequently: true })
+	probe.font = "16px " + coderainFontStack
+	probe.textBaseline = "top"
+	probe.fillStyle = "#fff"
+	var blankSig = coderainGlyphSignature(probe, null)
+	var tofuSig = coderainGlyphSignature(probe, "￿")
+
+	// half-width katakana first; if the font has none, full-width stands in
+	var kata = [0xFF66, 0xFF9D]
+	var sig = coderainGlyphSignature(probe, String.fromCodePoint(0xFF76))
+	if (sig === tofuSig || sig === blankSig) kata = [0x30A1, 0x30F6]
+
+	var c
+	for (c = kata[0]; c <= kata[1]; c++) coderainFilmGlyphs.push(String.fromCodePoint(c))
+	for (c = 0x30; c <= 0x39; c++) coderainFilmGlyphs.push(String.fromCharCode(c)) // digits
+	// the handful of latin and symbols visible in the sequence
+	var extra = "ZTHEKMNPRSUVWXY:=*+-<>|_"
+	for (c = 0; c < extra.length; c++) coderainFilmGlyphs.push(extra.charAt(c))
+
+	if (!coderainFilmGlyphs.length) {
+		for (c = 0x30; c <= 0x39; c++) coderainFilmGlyphs.push(String.fromCharCode(c))
+	}
+}
+
+// The film's green, hsl(135 100% 50%) - #00FF41. Used unless the rain colour
+// has actually been picked, or the rain is following the selected cipher, in
+// which case that colour drives this style too.
+//
+// Only the hue and saturation are taken from the pick. The shared lightness is
+// tuned for rain sitting behind a lit page - 19% - and this style is drawn on
+// black, where that is very nearly unlit. Saturation is floored for the same
+// reason: the default 20% is right for a texture behind text and reads as grey
+// against black.
+function coderainFilmColor() {
+	var picked = typeof coderainColorPicked !== "undefined" && coderainColorPicked
+	var follow = typeof optCoderainFollowCipher !== "undefined" && optCoderainFollowCipher
+	if (picked || follow) {
+		var c = getCodeRainColor()
+		return { h: c.h, s: Math.max(c.s, 55), l: 50 }
+	}
+	return { h: 135, s: 100, l: 50 }
+}
+
 // ---- colour -----------------------------------------------------------
 
 // When optCoderainFollowCipher is on, the rain borrows the hue and saturation
@@ -135,6 +202,7 @@ var coderainReducedMotion = false
 function coderainFrameInterval() {
 	if (coderainStyle === "retro") return 50
 	if (coderainStyle === "ccru") return 28
+	if (coderainStyle === "matrix") return 33
 	return 33
 }
 
@@ -159,9 +227,11 @@ function initCodeRain() {
 		w = canvas.width = document.body.offsetWidth
 		h = canvas.height = height_html
 
-		// starts clear: the fade erases alpha, so #canv's CSS background is what
-		// shows through rather than a painted copy of it
-		ctx.clearRect(0, 0, w, h)
+		// starts solid black - matrixRetro() repaints this every frame anyway,
+		// but without it the page's own background shows for the one frame
+		// before the interval below fires
+		ctx.fillStyle = "#000"
+		ctx.fillRect(0, 0, w, h)
 
 		cols = Math.floor(w / 14) + 1 // px
 		ypos = Array(cols).fill(0)
@@ -175,6 +245,15 @@ function initCodeRain() {
 		coderainCellH = 14
 		coderainFadeAlpha = 0.16
 		coderainSpeedMin = 0.70
+		coderainSpeedVar = 0.85
+	} else if (coderainStyle === "matrix") {
+		buildFilmGlyphs()
+		// tight columns and long trails: on screen the film's columns run most
+		// of the height, which a fast fade cannot produce
+		coderainCellW = 14
+		coderainCellH = 16
+		coderainFadeAlpha = 0.055
+		coderainSpeedMin = 0.40
 		coderainSpeedVar = 0.85
 	} else {
 		buildCodeRainGlyphs()
@@ -202,8 +281,14 @@ function initCodeRain() {
 	// of filled: it fades by erasing alpha, so the page background showing
 	// through #canv is the background, and priming the canvas opaque would just
 	// leave a full-screen layer to erode away over the first few seconds.
+	// Matrix is black, not "the page background with rain on it" - the film has
+	// no other colour in frame, and letting the theme show through behind it is
+	// the one thing that stops it reading as the film.
 	if (coderainStyle === "ccru") {
 		ctx.fillStyle = coderainCCRUBg(1)
+		ctx.fillRect(0, 0, w, h)
+	} else if (coderainStyle === "matrix") {
+		ctx.fillStyle = "#000"
 		ctx.fillRect(0, 0, w, h)
 	} else {
 		ctx.clearRect(0, 0, w, h)
@@ -249,6 +334,7 @@ function matrix() {
 	if (!ctx) return
 	if (coderainStyle === "retro") matrixRetro()
 	else if (coderainStyle === "ccru") matrixCCRU()
+	else if (coderainStyle === "matrix") matrixFilm()
 	else matrixNew()
 }
 
@@ -411,6 +497,100 @@ function matrixNew() {
 	ctx.globalAlpha = 1
 }
 
+// ---- the film ---------------------------------------------------------
+//
+// What actually makes the title sequence recognisable, in order of how much it
+// matters:
+//
+//   1. the leading glyph is white, not bright green. Everything behind it is
+//      green. Nothing else in the sequence is any other colour.
+//   2. the whole field is mirrored, which is why the katakana look like
+//      katakana until you try to read them.
+//   3. glyphs in the trail change while they fall, so a column shimmers rather
+//      than sliding down as a fixed word.
+//   4. black. Not dark - black.
+//
+// Trails are state and the frame is repainted, the same as matrixNew(): see
+// the note there for why a multiplicative fade can never reach zero. Heads are
+// drawn in a second pass so the glow is set up once for the frame instead of
+// switched on and off a few thousand times.
+function matrixFilm() {
+
+	var maxRow = h / coderainCellH
+
+	// mirrored in one go, rather than per glyph. x' = w - x, so the columns
+	// mirror with the characters and the whole field reads reversed.
+	ctx.setTransform(-coderainDPR, 0, 0, coderainDPR, w * coderainDPR, 0)
+	ctx.globalCompositeOperation = "source-over"
+	ctx.shadowBlur = 0
+	ctx.globalAlpha = 1
+	ctx.fillStyle = "#000"
+	ctx.fillRect(0, 0, w, h)
+
+	var col = coderainFilmColor()
+	var body = "hsl("+col.h+","+col.s+"%,"+col.l+"%)"
+	var head = "hsl("+col.h+",68%,88%)" // white with just enough green left in it
+	var glow = "hsl("+col.h+","+col.s+"%,"+Math.min(col.l + 12, 62)+"%)"
+
+	ctx.font = "500 15px " + coderainFontStack
+	ctx.textBaseline = "top"
+
+	var fLen = coderainFilmGlyphs.length
+	var slow = coderainReducedMotion ? 0.25 : 1
+	var decay = 1 - coderainFadeAlpha
+	var heads = []
+
+	ctx.fillStyle = body
+	for (var i = 0; i < coderainDrops.length; i++) {
+		var drop = coderainDrops[i]
+		var prevRow = Math.floor(drop.row)
+		drop.row += drop.speed * slow
+		var newRow = Math.floor(drop.row)
+
+		for (var s = prevRow; s < newRow; s++) {
+			drop.glyphs.unshift(coderainFilmGlyphs[rndInt(0, fLen - 1)])
+			if (drop.glyphs.length > drop.trail) drop.glyphs.pop()
+		}
+
+		// one glyph somewhere down the column swaps out most frames - the
+		// shimmer, and cheap at one write per column
+		if (drop.glyphs.length > 2 && Math.random() < 0.5) {
+			drop.glyphs[1 + rndInt(0, drop.glyphs.length - 2)] = coderainFilmGlyphs[rndInt(0, fLen - 1)]
+		}
+
+		var x = i * coderainCellW
+		for (var k = 0; k < drop.glyphs.length; k++) {
+			var row = newRow - k
+			if (row < 0) break
+			if (row > maxRow) continue
+
+			var a = Math.pow(decay, k / drop.speed)
+			if (a < CODERAIN_MIN_ALPHA) break
+			if (k === 0) { heads.push({ g: drop.glyphs[0], x: x, y: row * coderainCellH }); continue }
+			ctx.globalAlpha = a
+			ctx.fillText(drop.glyphs[k], x, row * coderainCellH)
+		}
+
+		if (newRow - drop.trail > maxRow) {
+			drop.row = -Math.random() * maxRow * 1.05
+			drop.speed = coderainSpeed()
+			drop.trail = coderainTrailRows(drop.speed)
+			drop.glyphs = []
+		}
+	}
+
+	// the white leads, last and lit
+	ctx.globalAlpha = 1
+	ctx.fillStyle = head
+	ctx.shadowColor = glow
+	ctx.shadowBlur = 8
+	for (var n = 0; n < heads.length; n++) ctx.fillText(heads[n].g, heads[n].x, heads[n].y)
+	ctx.shadowBlur = 0
+
+	ctx.setTransform(coderainDPR, 0, 0, coderainDPR, 0, 0) // leave it as found
+	ctx.globalAlpha = 1
+}
+
 // The original rain: uniform column speed, matrix-font glyphs and a glow
 // shadow. The fade erases alpha rather than painting black over the top - see
 // matrixNew() for why - which keeps the same trail length without leaving the
@@ -420,14 +600,29 @@ function matrixRetro() {
 	// Same story as matrixNew(): fading in place leaves a permanent sliver of
 	// colour in every cell a glyph ever touched, so the trail is kept as state
 	// and the canvas is cleared and repainted each frame.
-	ctx.clearRect(0, 0, w, h)
+	//
+	// Repainted with solid black, not cleared to transparent. A transparent
+	// canvas lets #canv's CSS background (the page's blue-grey body colour)
+	// show through everywhere a glyph isn't, which is what actually made this
+	// look washed-out and foggy rather than the dark, high-contrast backdrop
+	// the original had - the original repainted a near-opaque black rectangle
+	// every frame too (a straight "#00000010" wash, left out here because
+	// accumulating a wash like that over hundreds of frames rounds to a fixed
+	// point above zero alpha and bakes in a permanent blocky residue; a solid
+	// fill has none of that and reads the same to the eye). Same technique
+	// matrixFilm() already uses for the same reason.
+	ctx.fillStyle = "#000"
+	ctx.fillRect(0, 0, w, h)
 	ctx.globalCompositeOperation = "source-over"
 
-	ctx.fillStyle = "hsl("+coderainHue+","+(coderainSat*100)+"%,"+(coderainLit*100)+"%)"
+	// getCodeRainColor() is coderainHue/Sat/Lit unchanged unless the rain is
+	// following the selected cipher, so a hand-picked colour reads as before
+	var rc = getCodeRainColor()
+	ctx.fillStyle = "hsl("+rc.h+","+rc.s+"%,"+rc.l+"%)"
 	ctx.font = "bold 18pt matrix-font"
 	ctx.textBaseline = "alphabetic"
 	if(navigator.userAgent.toLowerCase().indexOf('firefox') == -1) { // if not Firefox
-		ctx.shadowColor = "hsla("+coderainHue+",100%,50%,0.4)"
+		ctx.shadowColor = "hsla("+rc.h+",100%,50%,0.4)"
 		ctx.shadowBlur = 4
 	}
 
@@ -500,6 +695,8 @@ function coderainStateLabel() {
 	if (!optMatrixCodeRain) return coderainGlyphIcon + " Off"
 	if (coderainStyle === "retro") return coderainGlyphIcon + " Retro"
 	if (coderainStyle === "ccru") return coderainGlyphIcon + " CCRU"
+	if (coderainStyle === "matrix") return coderainGlyphIcon + " Matrix"
+	if (coderainStyle === "new") return coderainGlyphIcon + " Decode"
 	return coderainGlyphIcon + " On"
 }
 
@@ -508,11 +705,12 @@ function updateCodeRainToggleBtn() {
 	var btn = document.getElementById("bgToggleBtn")
 	if (btn !== null) {
 		btn.textContent = coderainStateLabel()
-		btn.title = "Background code rain: " + (optMatrixCodeRain ? coderainStyle : "off") + " (click to cycle Off, On, Retro, CCRU)"
-		btn.classList.remove("bgToggleOff", "bgToggleRetro", "bgToggleCCRU")
+		btn.title = "Background code rain: " + (optMatrixCodeRain ? coderainStyle : "off") + " (click to cycle Matrix, Off, Decode, Retro, CCRU)"
+		btn.classList.remove("bgToggleOff", "bgToggleRetro", "bgToggleCCRU", "bgToggleMatrix")
 		if (!optMatrixCodeRain) btn.classList.add("bgToggleOff")
 		else if (coderainStyle === "retro") btn.classList.add("bgToggleRetro")
 		else if (coderainStyle === "ccru") btn.classList.add("bgToggleCCRU")
+		else if (coderainStyle === "matrix") btn.classList.add("bgToggleMatrix")
 	}
 	var chk = document.getElementById("chkbox_MCR")
 	if (chk !== null) chk.checked = optMatrixCodeRain
@@ -522,9 +720,16 @@ function updateCodeRainToggleBtn() {
 //
 // Density and speed multipliers applied on top of whichever style is running,
 // so the hover panel tunes all three styles rather than needing its own set of
-// numbers per style. 1.0 is the tuned default for each.
-
-var coderainDensity = 1.0   // 0.2 sparse .. 2.0 heavy
+// numbers per style. 1.0 is the "full" tuned value for each, and is what
+// coderainResetIntensity() below restores.
+//
+// coderainDensity starts lower than that "full" value: a lot of people
+// screenshot the calculator the instant it loads (before typing anything),
+// and full-density rain competes with the calculator underneath for
+// attention in that shot. Anyone who wants it heavier can turn it up with
+// the density slider, same as always - this only changes what a cold load
+// looks like before anyone has touched the slider.
+var coderainDensity = 0.5   // 0.2 sparse .. 2.0 heavy
 var coderainSpeedMul = 1.0  // 0.3 slow .. 2.5 fast
 
 function coderainSetDensity(v) {
@@ -547,6 +752,7 @@ function coderainResetIntensity() {
 	var hu = document.getElementById("rainHueSlider")
 	if (d !== null) d.value = 1
 	if (sp !== null) sp.value = 1
+	coderainSetDensity(1)
 	coderainSetSpeed(1)
 	coderainHue = coderainHueDefault
 	coderainSat = coderainSatDefault
@@ -613,11 +819,12 @@ function coderainSyncColorInputs() {
 // untouched on a first visit.
 function coderainApplyBackdrop() {
 	var root = document.documentElement
-	// The standard style is meant to sit on the page's own background - tinting
-	// it as well made picking a colour feel like it was recolouring the site
-	// rather than the rain. Retro and CCRU are full-screen looks of their own,
-	// so they still carry the colour behind them.
-	if (!coderainColorPicked || coderainStyle === "new") {
+	// With the rain running, the colour belongs to the rain: tinting the page
+	// as well made picking a colour feel like it was recolouring the whole
+	// site. With the rain off there is nothing else for the colour to apply
+	// to, so it becomes the background - which is the only way to change the
+	// page colour without turning the rain on.
+	if (!coderainColorPicked || optMatrixCodeRain) {
 		root.style.removeProperty("--rain-backdrop")
 		return
 	}
@@ -629,6 +836,8 @@ function coderainSetFollow(on) {
 	optCoderainFollowCipher = !!on
 	var chk = document.getElementById("chkbox_CFC")
 	if (chk !== null) chk.checked = optCoderainFollowCipher
+	var fc = document.getElementById("rainFollowChk")
+	if (fc !== null) fc.checked = optCoderainFollowCipher
 	// following a cipher means the rain colour is no longer the user's pick, so
 	// the backdrop goes back to the stock page background
 	if (optCoderainFollowCipher) {
@@ -695,9 +904,11 @@ function coderainIntensityPanel() {
 	o += '<span class="rainTuneVal" id="rainSpeedVal">'+coderainSpeedMul.toFixed(2)+'x</span></div>'
 
 	// hue slider for a quick sweep, plus a real colour input like the per-cipher
-	// swatches in Color Controls for picking an exact shade
+	// swatches in Color Controls for picking an exact shade. Drives every
+	// style, retro included - coderainHue/Sat/Lit are shared, and retro reads
+	// them directly (see matrixRetro()).
 	o += '<div class="rainTuneRow"><span class="rainTuneLabel">Colour</span>'
-	o += '<input type="range" id="rainHueSlider" class="rainTuneSlider rainHueSlider" min="0" max="359" step="1" value="'+coderainHue+'" oninput="coderainSetHue(this.value)">'
+	o += '<input type="range" id="rainHueSlider" class="rainTuneSlider rainHueSlider" min="0" max="359" step="1" value="'+coderainHue+'" oninput="coderainSetHue(this.value)" title="Pick a rain colour">'
 	o += '<span class="rainTuneVal"><input type="color" id="rainColorPicker" class="rainColorPicker" value="'+hslToHex(coderainHue, coderainSat * 100, 55)+'" title="Pick a rain colour" oninput="coderainSetColorFromPicker(this.value)" onfocus="rainTunePin(true)" onblur="rainTunePin(false)"></span></div>'
 
 	o += '<div class="rainTuneRow rainTuneFoot">'
@@ -709,12 +920,13 @@ function coderainIntensityPanel() {
 	return o
 }
 
-// nav button: Off -> On (new) -> Retro -> CCRU -> Off
+// nav button: Matrix -> Off -> Decode -> Retro -> CCRU -> back round to Matrix
 function toggleCodeRainBtn() {
-	if (!optMatrixCodeRain) { optMatrixCodeRain = true; coderainStyle = "new" }
+	if (optMatrixCodeRain && coderainStyle === "matrix") { optMatrixCodeRain = false }
+	else if (!optMatrixCodeRain) { optMatrixCodeRain = true; coderainStyle = "new" }
 	else if (coderainStyle === "new") { coderainStyle = "retro" }
 	else if (coderainStyle === "retro") { coderainStyle = "ccru" }
-	else { optMatrixCodeRain = false; coderainStyle = "new" }
+	else { coderainStyle = "matrix" }
 	toggleCodeRain()
 }
 

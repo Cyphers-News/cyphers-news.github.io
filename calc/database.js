@@ -186,7 +186,9 @@ function updateDatabaseQueryTable(stPos = 0, dItems, scrollBarEvent = false) { /
 		ms = '<span class="minimizeLabel">Click to minimize</span>'
 		ms += '<div id="queryMinBtn">_</div>' // minimize button
 		ms += '<input type="range" min="0" max="'+sliderMax+'" value="'+curSliderPos+'" class="qSlider" id="queryScrollbar">' // slider/scrollbar
-		ms += '<input id="querySearchInput" type="text" spellcheck="false" autocomplete="off" value="'+searchBarValue+'" placeholder="Find...">' // search bar
+		// escaped: the box is redrawn with whatever was typed in it, and a
+		// quote in a search term would otherwise close the value attribute
+		ms += '<input id="querySearchInput" type="text" spellcheck="false" autocomplete="off" value="'+escHtml(searchBarValue)+'" placeholder="Find...">' // search bar
 		ms += '<table id="QueryTable" class="HistoryTable" data-startpos='+stPos+' data-dispitems='+dItems+'>'
 		ms += '<tbody>'
 	} else { // scrollbar used
@@ -232,10 +234,12 @@ function updateDatabaseQueryTable(stPos = 0, dItems, scrollBarEvent = false) { /
 			if (commentMatch !== null) {
 				tmpComment = commentMatch[0]
 			}
-			// comment first, phrase without comment and leading/trailing spaces
-			dispPhrase = (encodingMenuOpened) ? '<span class="pCHT">'+tmpComment+'</span>' + queryResult[x].replace(/\[.+\]/g, '').trim() : '<span class="pCHT">'+tmpComment+'</span>' + queryResult[x][1].replace(/\[.+\]/g, '').trim()
+			// comment first, phrase without comment and leading/trailing spaces -
+			// escaped after the bracket-comment is pulled out, same reasoning as
+			// the History Table's own version of this in calc/calc.js
+			dispPhrase = (encodingMenuOpened) ? '<span class="pCHT">'+escHtml(tmpComment)+'</span>' + escHtml(queryResult[x].replace(/\[.+\]/g, '').trim()) : '<span class="pCHT">'+escHtml(tmpComment)+'</span>' + escHtml(queryResult[x][1].replace(/\[.+\]/g, '').trim())
 		} else {
-			dispPhrase = (encodingMenuOpened) ? queryResult[x] : queryResult[x][1]
+			dispPhrase = (encodingMenuOpened) ? escHtml(queryResult[x]) : escHtml(queryResult[x][1])
 		}
 		ms += '<tr><td class="hPQ" data-ind="'+x+'">' + dispPhrase + '</td>' // phrase at index 1
 
@@ -352,7 +356,7 @@ function unloadDatabase() {
 	userDBlive = [] // clear live DB
 
 	document.getElementById("calcOptionsPanel").innerHTML = "" // clear menu panel
-	initCalc() // reinit
+	initCalc(false, true) // reinit; the selection is set from the database below
 	defaultCipherArray = [...defaultCipherArraySaved] // restore default ciphers choice
 	disableAllCiphers()
 

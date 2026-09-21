@@ -1,31 +1,66 @@
 <!DOCTYPE html>
+<html lang="en">
 <head>
-<title>Calculator</title>
+<title>Cyphers</title>
 <meta charset="utf-8">
-<meta name="viewport" content="width=520, maximum-scale=1, user-scalable=no">
-<link rel="shortcut icon" type="image/x-icon" href="res/favicon.png">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://maps.googleapis.com https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com; form-action 'self'; base-uri 'none'; object-src 'none'">
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-29C7RM73G7"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-29C7RM73G7');
+</script>
+<meta name="viewport" content="width=520">
+<link rel="shortcut icon" type="image/x-icon" href="res/favicon.png?v=20260821a">
 
 <!-- Android Web App - Add to Home Screen -->
 <link rel="manifest" href="manifest.json">
 
-<script src="lib/jquery.min.js"></script>
-<script src="lib/supabase.min.js"></script>
-<!-- html2canvas v1.0.0-alpha.12 -->
+<!-- Loaded before the scripts below so the stylesheets start downloading
+     immediately instead of queueing behind four blocking script fetches -
+     the scripts don't touch layout until later, but a <link> after them
+     used to wait its turn anyway. -->
+<link rel="stylesheet" type="text/css" href="calc/styles.css?v=20260920c">
+<link rel="stylesheet" type="text/css" href="auth/auth.css?v=20260919a">
+<link rel="stylesheet" type="text/css" href="calc/master-decoder.css?v=20260919a">
 
-<script src="calc/gematria.js"></script>
-<script src="calc/calc.js"></script>
-<script src="calc/init-variables.js"></script>
-<script src="calc/ciphers.js"></script>
+<!-- defer on every script below (except the inline ones, which can't defer -
+     see the DOMContentLoaded wrappers instead): lets the browser fetch all of
+     them in parallel while it keeps parsing the page, rather than blocking on
+     one script at a time in sequence. They still run in this exact order,
+     just after parsing finishes instead of interrupting it - script.js
+     onwards all depend on jQuery/calc.js/etc. being defined first, and defer
+     preserves that. html2canvas is deliberately not here any more - see
+     ensureHtml2Canvas() in export.js, loaded only once someone exports an
+     image instead of on every page load. -->
+<script src="lib/jquery.min.js?v=20260821q" defer></script>
+<script src="lib/supabase.min.js?v=20260821q" defer></script>
 
-<link rel="stylesheet" type="text/css" href="calc/styles.css">
-<link rel="stylesheet" type="text/css" href="auth/auth.css">
+<script src="calc/gematria.js?v=20260918b" defer></script>
+<script src="calc/calc.js?v=20260920b" defer></script>
+<script src="calc/init-variables.js?v=20260918b" defer></script>
+<script src="calc/ciphers.js?v=20260821q" defer></script>
 
 <script>
-window.onpaint = function() {
-	updateInterfaceColor(true); // update interface color (first run)
-}
-$(window).load(function(){
-	$("#loader").delay(287).fadeOut("fast");
+// Deferred scripts (jQuery, calc.js, etc. above) don't finish running until
+// just before DOMContentLoaded, so anything here that touches them - $,
+// updateInterfaceColor - has to wait for that event too, or it runs first
+// and finds them undefined.
+document.addEventListener('DOMContentLoaded', function () {
+	window.onpaint = function() {
+		updateInterfaceColor(true); // update interface color (first run)
+	}
+	// .on("load"), not .load(fn) — the shorthand was removed in jQuery 3, where
+	// .load() resolves to the AJAX method instead and calls .indexOf on its first
+	// argument. Passing a function there threw "e.indexOf is not a function" and
+	// the loading overlay never faded out.
+	$(window).on("load", function(){
+		$("#loader").delay(287).fadeOut("fast");
+	});
 });
 </script>
 
@@ -36,7 +71,33 @@ $(window).load(function(){
 <!-- <body onload="initCalc(true)"> --> 
 
 <div id="loader"></div>
-<canvas id="canv"></canvas>
+<canvas id="canv" aria-hidden="true"></canvas>
+
+<!-- Fixed so it survives whichever menu is rebuilding #calcOptionsPanel, and
+     stays reachable even once focus mode has hidden that whole row. -->
+<button id="focusModeBtn" class="focusModeBtn" type="button" title="Focus mode: hide the menu and phrase box for a clean screenshot (tap again to restore)" aria-label="Toggle focus mode" aria-pressed="false" onclick="toggleFocusMode()">
+	<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+		<path d="M12 15V3"></path>
+		<path d="M7.5 7.5L12 3l4.5 4.5"></path>
+		<path d="M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"></path>
+	</svg>
+</button>
+
+<!-- Mirrors #focusModeBtn on the opposite corner - opens a small panel
+     choosing what Focus Mode shows besides the equation. -->
+<button id="focusOptionsBtn" class="focusOptionsBtn" type="button" title="Choose what Focus Mode shows" aria-label="Focus mode display options" onclick="toggleFocusOptionsPanel()">
+	<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+		<line x1="4" y1="21" x2="4" y2="14"></line>
+		<line x1="4" y1="10" x2="4" y2="3"></line>
+		<line x1="12" y1="21" x2="12" y2="12"></line>
+		<line x1="12" y1="8" x2="12" y2="3"></line>
+		<line x1="20" y1="21" x2="20" y2="16"></line>
+		<line x1="20" y1="12" x2="20" y2="3"></line>
+		<line x1="1" y1="14" x2="7" y2="14"></line>
+		<line x1="9" y1="8" x2="15" y2="8"></line>
+		<line x1="17" y1="16" x2="23" y2="16"></line>
+	</svg>
+</button>
 
 <!-- preload font -->
 <span style="font-family: 'Roboto Mono';"></span>
@@ -56,12 +117,16 @@ $(window).load(function(){
 		<div id="dateCalcMenuArea"></div>
 		<div id="astroMenuArea"></div>
 		<div id="profileMenuArea"></div>
+		<div id="masterDecoderMenuArea"></div>
 
 		<div id="inputArea">
 		  <input id="queryDBbtn" class="hideValue" type="button" onclick="queryDatabase()" value="Query">
-		  <input id="phraseBox" autofocus type="text" spellcheck="false" autocomplete="off" oninput="updateEnabledCipherTable(); updateWordBreakdown(breakCipher,false,false);" onkeydown="phraseBoxKeypress(event.keyCode)" ondrop="dropHandler(event)" ondragover="dragOverHandler(event)">
-		  <input id="enterPhraseBtn" type="button" onclick="phraseBoxKeypress(13);document.getElementById('phraseBox').focus()" value="&#x270E;">
-		  <input id="highlightBox" type="text" spellcheck="false" autocomplete="off"><span id="clearFilterButton"></span>
+		  <input id="phraseBox" aria-label="Phrase or number to decode" autofocus type="text" spellcheck="false" autocomplete="off" oninput="updateEnabledCipherTable(); updateWordBreakdown(breakCipher,false,false);" onkeydown="phraseBoxKeypress(event.keyCode)" ondrop="dropHandler(event)" ondragover="dragOverHandler(event)">
+		  <!-- a <button> rather than an <input>, so the return arrow can be drawn:
+		       Montserrat has no glyph for U+23CE or U+21B5, so a text one fell back
+		       to whatever the system had and came out thin and undersized -->
+		  <button id="enterPhraseBtn" type="button" title="Add this phrase to the table (Enter)" aria-label="Add phrase" onclick="phraseBoxKeypress(13);document.getElementById('phraseBox').focus()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 10 5 14 9 18"></polyline><path d="M20 6v4a4 4 0 0 1-4 4H5"></path></svg></button>
+		  <input id="highlightBox" aria-label="Filter and highlight the history table" type="text" spellcheck="false" autocomplete="off"><span id="clearFilterButton"></span>
 		</div>
 
 		<div id="enabledCiphTable"></div>
@@ -80,45 +145,86 @@ $(window).load(function(){
 
 <span id="loadPanel"></span>
 
-<script src="calc/breakdown.js"></script>
+<script src="calc/breakdown.js?v=20260918b" defer></script>
 
-<script src="calc/highlighter.js"></script>
-<script src="calc/export.js"></script>
-<script src="calc/export-csv.js"></script>
-<script src="calc/num-prop.js"></script>
-<script src="calc/edit-ciphers.js"></script>
-<script src="calc/date-calc.js"></script>
-<script src="calc/astrology.js"></script>
-<script src="calc/profile-tab.js"></script>
-<script src="calc/profile-chart.js"></script>
-<script src="calc/database.js"></script>
-<script src="calc/quick-guide.js"></script>
+<script src="calc/highlighter.js?v=20260821q" defer></script>
+<script src="calc/export.js?v=20260918b" defer></script>
+<script src="calc/export-csv.js?v=20260918b" defer></script>
+<script src="calc/num-prop.js?v=20260821q" defer></script>
+<script src="calc/edit-ciphers.js?v=20260821q" defer></script>
+<script src="calc/date-calc.js?v=20260821q" defer></script>
+<script src="calc/astrology.js?v=20260920f" defer></script>
+<script src="calc/flat-earth.js?v=20260920c" defer></script>
+<script src="calc/master-decoder.js?v=20260919a" defer></script>
+<script src="calc/profile-tab.js?v=20260919a" defer></script>
+<script src="calc/profile-chart.js?v=20260920a" defer></script>
+<script src="calc/social-reply.js?v=20260821q" defer></script>
+<script src="calc/friends-tab.js?v=20260919a" defer></script>
+<script src="calc/forum-tab.js?v=20260821q" defer></script>
+<script src="calc/tour.js?v=20260821q" defer></script>
+<script src="calc/database.js?v=20260920e" defer></script>
+<script src="calc/quick-guide.js?v=20260821q" defer></script>
 
-<script src="calc/localstorage.js"></script>
-<script src="calc/encoding.js"></script>
-<script src="calc/encoding-ciphers.js"></script>
+<script src="calc/localstorage.js?v=20260821q" defer></script>
+<script src="calc/encoding.js?v=20260918b" defer></script>
+<script src="calc/encoding-ciphers.js?v=20260821q" defer></script>
 
-<script src="calc/coderain.js"></script>
+<script src="calc/coderain.js?v=20260918b" defer></script>
 
-<script src="auth/supabase-config.js"></script>
-<script src="auth/auth.js"></script>
-<script src="auth/auth-ui.js"></script>
-<script src="auth/history-sync.js"></script>
-<script src="auth/workspace-sync.js"></script>
-<script src="auth/profile-features.js"></script>
-<script src="lib/html2canvas.min.js"></script>
+<!-- after every script that declares an option, before anything that restores one -->
+<script src="calc/reset-defaults.js?v=20260821q" defer></script>
 
-<!-- Initialzie the calculator.  This needs to run before loading a database or theme. -->
+<script src="auth/supabase-config.js?v=20260821q" defer></script>
+<script src="auth/auth.js?v=20260919b" defer></script>
+<script src="auth/auth-ui.js?v=20260821q" defer></script>
+<script src="auth/username-gate.js?v=20260919b" defer></script>
+<script src="auth/history-sync.js?v=20260821q" defer></script>
+<script src="auth/workspace-sync.js?v=20260821q" defer></script>
+<script src="auth/profile-features.js?v=20260821q" defer></script>
+<script src="auth/friends.js?v=20260821q" defer></script>
+<script src="auth/chat.js?v=20260821q" defer></script>
+<script src="auth/forum.js?v=20260821q" defer></script>
+<script src="auth/master-decoder-data.js?v=20260918a" defer></script>
+<script src="auth/tour-sync.js?v=20260821q" defer></script>
+<script src="auth/admin.js?v=20260821q" defer></script>
+
+<!-- Initialzie the calculator.  This needs to run before loading a database or theme.
+     Wrapped in DOMContentLoaded, same reason as the <head> script above - the
+     deferred scripts it depends on (initCalc, onAuthReady, ...) aren't defined
+     until then. -->
 <script>
+document.addEventListener('DOMContentLoaded', function () {
 	initCalc(true);
+
+	// Signing in lands here, on the calculator. The welcome page is reached
+	// from exactly one place - a member who has not been through it yet - so
+	// there is no path that can send a returning member back to it.
+	//
+	// It used to be the other way round: every sign-in went to the welcome and
+	// that page decided whether to bounce back, which meant any failure to
+	// record "already seen" left a member stuck behind it on every visit.
+	if (typeof onAuthReady === "function") {
+		onAuthReady(function (user) {
+			if (user === null || !authProfile) return;
+			if (authProfile.setup_done !== false) return; // seen it, or column absent
+			window.location.replace("profile.html");
+		});
+	}
+});
 </script>
 
 <!-- AUTO LOAD DATABASE (DB) -->
 <!-- To change the word matching database reference a different file in the script below or append lines to db.txt -->
 
 <script>
-	var database = loadFile('db.txt');
-	importFileAction(database, true);
+document.addEventListener('DOMContentLoaded', function () {
+	// async: the calculator (and code rain, and login) is already interactive
+	// by the time this resolves, instead of the whole tab freezing until a
+	// multi-megabyte file finishes downloading. See loadFileAsync().
+	loadFileAsync('db.txt', function (database) {
+		if (database !== null) importFileAction(database, true);
+	});
+});
 </script>
 
 <!-- AUTO LOAD THEME -->
@@ -130,3 +236,4 @@ $(window).load(function(){
 </script> -->
 
 </body>
+</html>

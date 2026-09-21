@@ -305,6 +305,7 @@
 .authNavPrimary { color: var(--focus-outline); }
 
 .authNavUser {
+	position: relative; /* anchors .authNavBadge, the unread dot */
 	display: inline-flex;
 	align-items: center;
 	gap: 0.4em;
@@ -313,6 +314,21 @@
 	border-bottom: none !important;
 }
 .authNavUser:hover { color: var(--font-white-1); background-color: var(--btn-hover-accent); }
+/* unread friends/requests/chats, mirrored here from the Friends tab (see
+   friendsRefreshBadge() in friends-tab.js) so it is visible from anywhere in
+   the site, not only once the profile panel is open */
+.authNavBadge {
+	position: absolute;
+	top: 1px;
+	right: 1px;
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	background-color: var(--notif-green);
+	border: 1.5px solid var(--body-bg-accent);
+	box-shadow: 0 0 5px hsla(140 90% 55% / 0.7);
+	pointer-events: none;
+}
 .authNavAvatar {
 	width: 20px; height: 20px;
 	border-radius: 50%;
@@ -348,20 +364,40 @@
 	box-sizing: border-box;
 	padding-right: 1em;
 }
+/* One line, Presets through Account, always - a row that wraps reads as two
+   separate menus stacked on top of each other, and no scrollbar either: with
+   Chart moved out (now reached from Astro instead - astrology.js), seven tabs
+   fit the 520px layout viewport (see the media query below) on their own. */
 .profileTabs {
 	display: flex;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
 	gap: 0.2em;
 	padding: 0em 0.2em 0.7em 0.2em;
 	border-bottom: 1px solid var(--separator-accent2);
 	margin-bottom: 0.8em;
 }
+/* The close button sits inside this panel's top-right corner (see
+   .profileBG > .closeMenuBtn above), 30px tall - and the tab row runs the
+   full width, so its last tab, Account, landed underneath it wherever the row
+   fills the panel. There is no width to spare to move the row aside (seven
+   tabs, one line, no scroll), so the row starts just below the button
+   instead. Height, not width: it holds at every panel size. */
+.profileBG > .profileTabs { margin-top: 28px; }
 .intBtn3.profileTab {
 	width: auto;
-	padding: 0.2em 0.8em;
+	flex: 0 1 auto;
+	white-space: nowrap;
+	padding: 0.2em 0.45em;
 	font-size: 88%;
 	margin: 0;
 	opacity: 0.6;
+}
+/* the site's own viewport meta pins the layout viewport at 520px on every
+   device, phone or desktop, so this is the tier that actually applies in
+   practice - not a "small phone" fallback, the normal case */
+@media (max-width: 620px) {
+	.profileTabs { gap: 0.1em; }
+	.intBtn3.profileTab { padding: 0.16em 0.22em; font-size: 72%; }
 }
 .intBtn3.profileTab.profileTabOn {
 	opacity: 1;
@@ -396,6 +432,40 @@
 }
 .profileSearchInput:focus { border-color: var(--focus-outline); }
 .profileCount { font-size: 80%; color: var(--font-white-4); min-width: 3em; text-align: right; }
+/* Enabled only once the box holds a phrase not already saved verbatim - see
+   profileAddFromSearch() - so it never reads as a second search button. */
+.profileAddBtn { flex: 0 0 auto; white-space: nowrap; }
+/* Live gematria preview under the search/add box - see profilePreviewUpdate().
+   Reserves its line even when empty so the row above it does not jump. */
+.profilePreview {
+	min-height: 1.3em;
+	padding: 0 0.1em 0.6em 0.1em;
+	font-size: 85%;
+	color: var(--font-white-3);
+}
+.profilePreview b { color: var(--font-white-1); }
+/* Collapsed by default - see profileHidePublishedGet(). One line, not a
+   button, so it reads as part of the list rather than another control. */
+/* a real button, not a quiet text link - it decides whether a whole section
+   of the tab is showing, which is worth more visual weight than "hide
+   published" reads as at plain body-text size */
+.profilePublishedSep {
+	border-top: 1px solid var(--separator-accent2);
+	margin: 0.9em 0 0.7em 0;
+}
+.profilePublishedToggle {
+	display: inline-block;
+	font-size: 88%;
+	font-weight: 700;
+	color: var(--font-white-1);
+	background-color: var(--btn-active-accent);
+	border: 1px solid var(--focus-outline);
+	cursor: pointer;
+	padding: 0.4em 0.8em;
+	margin-bottom: 0.4em;
+	user-select: none;
+}
+.profilePublishedToggle:hover { background-color: var(--btn-hover-accent); }
 
 .profileList {
 	max-height: 340px;
@@ -422,7 +492,9 @@
 }
 .profileRowPhrase:hover { text-decoration: underline; }
 .profileRowActions { display: flex; align-items: center; gap: 0.35em; flex: 0 0 auto; }
-.profileWhen { font-size: 80%; color: var(--font-white-4); }
+/* also a timestamp in the Social lists (forum notifications, chat
+   notifications), so it moves up the ramp with the rest of them */
+.profileWhen { font-size: 80%; color: var(--font-white-2); }
 
 .profileMiniBtn {
 	font-size: 80%;
@@ -438,6 +510,63 @@
 .profileMiniBtn:disabled { opacity: 0.5; cursor: default; }
 .profileMiniBtn.profileMiniDanger { color: hsl(5 70% 68%); }
 .profileMiniBtn.profileMiniDanger:hover { background-color: hsla(5 60% 45% / 0.3); }
+.profileMiniBtn.profileMiniBtnOn { background-color: var(--btn-active-accent); color: var(--font-white-1); font-weight: 600; }
+
+/* Leaderboard / Trending toggle, above the Leaders tab body */
+.profileViewToggle { display: flex; gap: 0.4em; padding-bottom: 0.7em; }
+.profileViewToggle .profileMiniBtn { font-size: 88%; padding: 0.3em 0.8em; }
+@media (max-width: 620px) {
+	/* Leaderboard + four phrase tabs do not comfortably fit one line on a
+	   phone - scrolls sideways rather than shrinking the labels down to
+	   something hard to read or hiding any of them in a dropdown */
+	.profileViewToggle {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		padding-bottom: 0.5em;
+		-webkit-mask-image: linear-gradient(to right, black calc(100% - 18px), transparent 100%);
+		mask-image: linear-gradient(to right, black calc(100% - 18px), transparent 100%);
+	}
+	.profileViewToggle .profileMiniBtn { flex: 0 0 auto; white-space: nowrap; }
+}
+
+/* a trending phrase's byline - who published it, since the chip is no longer
+   grouped under their name the way it is on the Leaderboard */
+.profileTrendBy {
+	display: block;
+	font-size: 74%;
+	color: var(--font-white-3);
+	padding-top: 0.15em;
+}
+/* the reset sits apart from the naming row below it, so the two are not read
+   as one control */
+/* Sized to sit on one line at the panel's width. Where it cannot - a phone -
+   balance splits it evenly rather than dropping one word onto the second
+   line, which is what looked wrong in the first place. */
+.profileNoteOneLine {
+	text-wrap: pretty;
+	text-wrap: balance;
+}
+
+.profileDefaultRow {
+	display: flex;
+	align-items: center;
+	gap: 0.6em;
+	flex-wrap: wrap;
+	padding: 0.5em 0 0.9em 0;
+	margin-bottom: 0.6em;
+	border-bottom: 1px solid var(--separator-accent2);
+}
+.profileMiniBtn.profileDefaultBtn { padding: 0.25em 0.7em; }
+.profilePresetSaveRow { padding-top: 0.2em; }
+
+/* armed: one more click carries it out. Replaces window.confirm, which the
+   browser suppresses, so the button has to say so itself. */
+.profileMiniBtn.profileArmed {
+	background-color: hsl(5 60% 42%);
+	border-color: hsl(5 65% 58%);
+	color: #fff;
+	font-weight: 600;
+}
 
 .profileBadge {
 	font-size: 78%;
@@ -534,11 +663,116 @@
 	max-width: 9em;
 	outline: none;
 }
+
+/* Searchable cipher picker. The menu is parented to <body> and positioned in
+   fixed coordinates, because its row lives in a 340px scroll box that would
+   otherwise clip it. profileCiphPlace() sets left/top/width/max-height. */
+.profileCiphPick { position: relative; display: inline-block; }
+.profileCiphInput { width: 9em; }
+/* the value this phrase would get under the picked cypher - profileCiphValHtml
+   sets its own inline colour per cypher, this just sizes and spaces it */
+.profileCiphVal { font-size: 82%; font-weight: 700; padding-left: 0.4em; white-space: nowrap; }
+.profileCiphInput::placeholder { color: var(--font-white-4); }
+.profileCiphMenu {
+	position: fixed;
+	z-index: 40;
+	overflow-y: auto;
+	background-color: var(--menu-bg-accent, var(--input-bg-accent));
+	border: 1px solid var(--border-accent);
+	box-shadow: 0 6px 18px hsla(0 0% 0% / 0.45);
+	font-size: 78%;
+}
+.profileCiphGroup {
+	padding: 0.25em 0.5em 0.1em;
+	color: var(--font-white-4);
+	font-size: 88%;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	position: sticky;
+	top: 0;
+	background-color: var(--menu-bg-accent, var(--input-bg-accent));
+}
+.profileCiphOpt {
+	padding: 0.22em 0.6em;
+	color: var(--font-white-2);
+	cursor: pointer;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.profileCiphOpt b { color: var(--font-white-1); font-weight: 700; }
+.profileCiphOpt.profileCiphOn { background-color: var(--btn-hover-accent); color: var(--font-white-1); }
+.profileCiphNone { padding: 0.4em 0.6em; color: var(--font-white-4); }
+.profileChipTerm { display: block; }
+/* the all-time ranking position, on a phrase chip in one of Leaders' three
+   phrase tabs - only shown there, and only in "all time" mode (see
+   renderProfilePhraseRankBody), since a rank number in newest-first order
+   would just be a row count, not a ranking */
+.profileChipRank {
+	display: inline-block;
+	font-size: 72%;
+	font-weight: 700;
+	color: var(--font-white-3);
+	padding-right: 0.3em;
+}
+/* the four ordering options under Leaders' phrase-ranking tabs (Recent /
+   A–Z / Low→High / the tab's own top-of-all-time label), as one centred,
+   connected slider with a sliding thumb - four equal segments, so no two
+   labels ever compete for the same space the way the original two-state
+   version did. */
+.profileRankModesWrap { display: flex; justify-content: center; margin: 0.1em 0 0.7em 0; }
+.profileRankModes4 {
+	position: relative;
+	display: flex;
+	width: 100%;
+	max-width: 440px;
+	padding: 2px;
+	border-radius: 999px;
+	background: hsl(0 0% 100% / 0.05);
+	border: 1px solid var(--border-dark-accent);
+}
+.profileRankModes4Thumb {
+	position: absolute;
+	top: 2px; bottom: 2px; left: 2px;
+	width: calc(25% - 2px);
+	border-radius: 999px;
+	background: var(--btn-active-accent);
+	box-shadow: inset 0 0 0 1px var(--focus-outline);
+	transition: transform 0.18s ease;
+}
+@media (prefers-reduced-motion: reduce) { .profileRankModes4Thumb { transition: none; } }
+.profileRankModes4Opt {
+	position: relative;
+	z-index: 1;
+	flex: 1 1 25%;
+	min-width: 0;
+	background: transparent;
+	border: none;
+	padding: 0.32em 0.3em;
+	font-size: 76%;
+	font-weight: 500;
+	color: var(--font-white-3);
+	cursor: pointer;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	transition: color 0.15s ease;
+}
+.profileRankModes4Opt.profileRankModes4OptOn { color: var(--font-white-1); font-weight: 700; }
+/* The cipher and its value, in that cipher's own colour. Bold because this is
+   the reason the phrase was published, not a footnote to it - the grey it used
+   to be read as disabled text. The inline colour comes from profileCipherColor. */
 .profileChipCiph {
 	display: block;
 	font-size: 78%;
-	color: var(--font-white-4);
+	font-weight: 700;
+	color: var(--font-white-2);
 	padding-top: 0.1em;
+}
+.profileChipVal {
+	font-family: var(--font-family-mono), monospace;
+	font-weight: 700;
+	color: inherit;
 }
 
 /* A submission refused by the publishing rules. The row turns red and keeps
@@ -559,6 +793,12 @@
 
 .profileLbRow { cursor: pointer; }
 .profileLbRow:hover { background: var(--btn-hover-accent); }
+/* Which name is expanded, so a second click on it reads as "close this" rather
+   than doing nothing visible. */
+.profileLbRow.profileLbOpen {
+	background: var(--btn-hover-accent);
+	border-left: 2px solid var(--font-white-3);
+}
 .profileLbRank {
 	font-family: var(--font-family-mono), monospace;
 	font-size: 85%;
@@ -602,6 +842,133 @@
 	cursor: pointer;
 }
 .profileChip:hover { background: var(--btn-hover-accent); color: var(--font-white-1); }
+
+/* heart / fire / laugh, under the phrase and cypher in the same chip - its
+   own row so a click there doesn't also fire the chip's "send to the
+   calculator" (profileChipReact stops that click reaching the chip).
+
+   Opacity is set per-button, not on this wrapping row: CSS opacity on a
+   parent caps every descendant's rendered opacity, so a lit button inside a
+   faded row would still render faded no matter what opacity it declared for
+   itself - it has to be the button, not the row, that starts invisible. */
+.profileChipReact {
+	display: flex;
+	align-items: center;
+	gap: 0.3em;
+	padding-top: 0.3em;
+	cursor: default;
+}
+
+/* The sum of all four reactions - deliberately nothing like the buttons
+   next to it: no emoji, square-ish corners instead of a pill, a solid dark
+   panel instead of a translucent tint, and no hover/pointer state at all,
+   because it is not a control. This is the one place "how many, total"
+   lives; every other pill below it answers "which ones, and did I". Plain
+   type though, matching .profileReactCount right next to it (88%, 600) -
+   the dark chip is what sets this apart, not an oversized number or a
+   spelled-out "TOTAL" label. */
+.profileReactTotal {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.1em 0.5em;
+	border-radius: 5px;
+	background: hsl(220 20% 9%);
+	border: 1px solid hsl(0 0% 100% / 0.16);
+	line-height: 1.5em;
+	font-size: 88%;
+	font-weight: 600;
+	color: var(--font-white-1);
+	font-variant-numeric: tabular-nums;
+	cursor: default;
+	user-select: none;
+}
+.profileReactDivider {
+	width: 1px;
+	align-self: stretch;
+	min-height: 1.4em;
+	background: hsl(0 0% 100% / 0.16);
+}
+
+/* Nothing reacted to yet: always visible, muted rather than hidden - a
+   member has to be able to tell a reaction is there and selectable without
+   hovering first, which touch has no way to do at all. Full colour and
+   opacity the moment it has a count (.profileReactLit below) or is hovered/
+   focused. */
+.profileReactBtn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.2em;
+	font-size: 90%;
+	padding: 0.05em 0.35em;
+	background: hsl(0 0% 100% / 0.05);
+	border: 1px solid var(--border-dark-accent);
+	border-radius: 999px;
+	color: var(--font-white-3);
+	cursor: pointer;
+	line-height: 1.5em;
+	opacity: 0.55;
+	filter: grayscale(1);
+	transition: opacity 0.2s ease, filter 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.phraseRow:hover .profileReactBtn,
+.profileReactBtn:focus {
+	opacity: 1;
+}
+.profileReactBtn:hover {
+	background: var(--btn-hover-accent);
+	border-color: var(--font-white-3);
+	filter: grayscale(0);
+}
+
+/* Reacted to by at least one person (profileReactLit, count > 0): visible
+   and readable for every viewer, permanently, not just on hover - but
+   neutral, not coloured. A count is information ("N people reacted this
+   way"), not a claim that you are one of them - only .profileReactMine
+   below is allowed to say that, so this used to be four different hues
+   (one per reaction) and is now one shared neutral state for all of them,
+   keeping "someone reacted" and "you reacted" from reading as the same
+   kind of highlight. */
+.profileReactBtn.profileReactLit {
+	opacity: 1;
+	filter: grayscale(0);
+	background: hsl(0 0% 100% / 0.09);
+	border-color: hsl(0 0% 100% / 0.24);
+	color: var(--font-white-1);
+}
+/* The one you personally cast - always bright green, regardless of which
+   of the four reactions it is, so "you reacted" is one consistent signal
+   instead of four different colours each meaning something different
+   depending on which button happened to be lit. Overrides .profileReactLit
+   above since a reaction you cast is always also lit. */
+.profileReactBtn.profileReactMine {
+	opacity: 1;
+	filter: grayscale(0);
+	background: hsl(140 60% 32% / 0.38);
+	border-color: hsl(140 75% 55%);
+	color: var(--font-white-1);
+	box-shadow: 0 0 0 1px hsl(140 75% 55% / 0.45), 0 0 9px hsl(140 85% 55% / 0.4);
+}
+.profileReactBtn.profileReactMine:hover {
+	background: hsl(140 60% 32% / 0.5);
+}
+.profileReactMineCheck {
+	font-size: 82%;
+	line-height: 1;
+	color: hsl(140 85% 72%);
+}
+.profileReactCount { font-size: 88%; font-weight: 600; }
+
+/* the one-off pulse when a reaction is switched on (profileFlashReaction) -
+   on top of the standing .profileReactLit glow above, so the moment of
+   toggling reads as something that just happened */
+@keyframes profileReactPulse {
+	0%   { box-shadow: 0 0 0 0 hsla(140 90% 55% / 0.65); }
+	100% { box-shadow: 0 0 0 10px hsla(140 90% 55% / 0); }
+}
+.profileReactBtn.profileReactFlash { animation: profileReactPulse 0.6s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+	.profileReactBtn.profileReactFlash { animation: none; }
+}
 
 .profileAccountHead { display: flex; align-items: center; gap: 0.8em; padding: 0.2em 0.3em 1em 0.3em; }
 .profileBigAvatar {
@@ -690,10 +1057,26 @@
 .pcZodiacRow { display: flex; align-items: center; gap: 0.4em; flex-wrap: wrap; padding-bottom: 0.6em; }
 .intBtn3.pcZodBtn { width: auto; margin: 0; padding: 0.25em 0.8em; }
 .intBtn3.pcZodBtn.pcZodOn { background-color: var(--btn-active-accent); color: var(--font-white-1); font-weight: 600; }
+/* One toolbar: the zodiac switch on the left, the print buttons pushed to the
+   right with margin-left:auto so they stay right-aligned however the row wraps. */
+.pcPrintGroup { display: flex; align-items: center; gap: 0.4em; margin-left: auto; flex-wrap: wrap; }
+.pcPrintLab { font-size: 80%; color: var(--font-white-3); font-weight: 600; }
+.intBtn3.pcPrintBtn { border-color: var(--font-white-4); }
+/* the sentence about the two zodiacs, moved off the toolbar now five controls
+   share it */
+.pcZodiacNote { padding-bottom: 0.6em; }
+@media (max-width: 620px) { /* stacked rather than squeezed */
+	.pcPrintGroup { margin-left: 0; padding-top: 0.3em; }
+}
 
 .pcFields { padding-bottom: 0.6em; }
+/* Time and Place as separate blocks. They used to be four rows in one stack at
+   equal spacing, so the tickbox that belonged to Time sat just as close to
+   Place as to Time and the two questions read as one. */
+.pcBlock { padding-top: 0.45em; margin-top: 0.45em; border-top: 1px solid var(--separator-accent2); }
+.pcRowSub { padding-top: 0; } /* a continuation of the row above, not a new one */
 .pcRow { display: flex; align-items: center; gap: 0.4em; padding: 0.18em 0; flex-wrap: wrap; }
-.pcLab { font-size: 82%; color: var(--font-white-3); width: 5em; flex: 0 0 auto; }
+.pcLab { font-size: 82%; color: var(--font-white-1); font-weight: 600; width: 5em; flex: 0 0 auto; }
 .pcIn {
 	font-family: var(--font-family), "Arial", sans-serif;
 	font-size: 88%;
@@ -706,27 +1089,1785 @@
 }
 .pcIn.pcInY { width: 5em; }
 .pcIn.pcInPlace { flex: 1 1 10em; width: auto; min-width: 0; }
-.pcChk { font-size: 80%; color: var(--font-white-3); display: inline-flex; align-items: center; gap: 0.3em; cursor: pointer; }
+.pcChk { font-size: 80%; color: var(--font-white-3); display: inline-flex; align-items: center; gap: 0.4em; cursor: pointer; }
+/* These were real checkboxes all along, but styles.css hides every native one
+   ("input[type=checkbox] { visibility: hidden }") on the assumption that a
+   .custChkBox span follows it. There is none here, so the box was invisible and
+   the label read as plain text with no way to tell it was on or off. Rather
+   than bolt on the span, the input itself is drawn: same look, one element,
+   and the label still toggles it. */
+.pcChk input[type=checkbox] {
+	visibility: visible;
+	-webkit-appearance: none;
+	appearance: none;
+	position: relative;
+	flex: 0 0 auto;
+	margin: 0;
+	width: 15px;
+	height: 15px;
+	background-color: var(--btn-bg-accent);
+	border: 1px solid var(--border-accent);
+	cursor: pointer;
+}
+.pcChk:hover input[type=checkbox] { background-color: var(--btn-hover-accent); }
+.pcChk input[type=checkbox]:active { background-color: var(--btn-active-accent); }
+.pcChk input[type=checkbox]:checked::after { /* the tick */
+	content: "";
+	position: absolute;
+	left: 4px;
+	top: 0px;
+	width: 3px;
+	height: 8px;
+	border: solid var(--font-white-1);
+	border-width: 0 2px 2px 0;
+	transform: rotate(45deg);
+}
+.pcChk input[type=checkbox]:focus-visible { outline: 1px solid var(--font-white-3); outline-offset: 1px; }
 .pcUnknown { font-style: italic; }
 .pcGeo { padding-bottom: 0.4em; }
 
 .pcCanvasWrap { display: flex; justify-content: center; padding: 0.4em 0 0.6em 0; }
-#pcCanvas { max-width: 100%; }
+/* The element is square by rule, not by measurement. Setting both dimensions
+   in JS meant a later reflow could clamp the width through max-width while the
+   inline height stood, and the chart was drawn into a tall rectangle. */
+#pcCanvas {
+	display: block;
+	width: 100%;
+	max-width: 440px;
+	height: auto;
+	aspect-ratio: 1 / 1;
+}
 
 .pcSectionTitle {
 	font-weight: 600; color: var(--font-white-1);
 	border-bottom: 1px solid var(--separator-accent2);
 	padding-bottom: 0.25em; margin: 0.6em 0 0.4em 0;
 }
-.pcGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11em, 1fr)); gap: 0.15em 0.6em; }
-.pcCell { display: flex; align-items: baseline; gap: 0.35em; font-size: 86%; }
+/* Transits are a separate reading from the birth chart above them, and the two
+   were running together. A rule and real space make the break obvious. */
+#pcTransits {
+	margin-top: 1.1em;
+	padding-top: 0.9em;
+	border-top: 2px solid var(--border-accent);
+}
+#pcTransits .pcSectionTitle { margin-top: 0; }
+.pcAngles {
+	margin-top: 0.5em;
+	padding-top: 0.5em;
+	border-top: 1px solid var(--separator-accent2);
+}
+/* chart on the left, the reading beside it; stacks on a narrow panel */
+.pcSplit { display: flex; gap: 0.9em; align-items: flex-start; flex-wrap: wrap; }
+/* The reading is as wide as its longest line and no wider; the wheel expands
+   into whatever is left.
+   flex-basis is 0, not the content: with a content basis the wrapper is sized
+   by the canvas inside it and the canvas is sized from the wrapper, so each
+   waits on the other and the first paint settles on the wrong answer. */
+.pcSplit .pcCanvasWrap { flex: 1 1 0; padding: 0; min-width: 180px; justify-content: center; }
+/* Sized to its own lines, but capped: the notes underneath are full sentences
+   and were stretching the column to 404px, leaving the chart 250px and a
+   square drawn into a tall rectangle. */
+.pcReading { flex: 0 1 auto; min-width: 0; max-width: 44%; }
+/* The notes are sentences; the rows above them are short. Left to itself the
+   column takes the width of the longest sentence, which is what was squeezing
+   the chart. They wrap to the width the rows need instead. */
+.pcReading .profileNote { white-space: normal; max-width: 20em; }
+.pcAyan { font-style: italic; }
+
+/* the reading only needs to be as wide as its longest line, so it is sized to
+   its content rather than stretching to fill whatever is left */
+.pcHouses { display: flex; flex-direction: column; }
+.pcHouseBlock {
+	border-left: 2px solid var(--border-accent);
+	border-bottom: 1px solid var(--separator-accent2);
+	padding: 0.3em 0.4em 0.35em 0.5em;
+}
+.pcHouseBlock:last-child { border-bottom: none; }
+.pcHouseHead {
+	font-size: 80%; font-weight: 700; letter-spacing: 0.03em;
+	color: var(--font-white-1); cursor: help;
+}
+.pcCell { display: flex; align-items: baseline; gap: 0.35em; font-size: 86%; cursor: help; white-space: nowrap; }
+.pcSign { color: var(--font-white-2); cursor: help; }
+.pcSign:hover { color: var(--font-white-1); }
+.pcAngles { display: flex; gap: 0.9em; font-size: 84%; font-weight: 600; }
+.pcAngles span { cursor: help; }
+
+/* one shared hover explanation, following the pointer */
+.pcTipBox {
+	position: fixed;
+	z-index: 4000;
+	max-width: 22em;
+	font-size: 84%;
+	line-height: 1.4em;
+	color: var(--font-white-1);
+	background-color: var(--menu-bg-accent);
+	border: 1px solid var(--border-accent);
+	padding: 0.45em 0.6em;
+	pointer-events: none;
+	box-shadow: 0 2px 10px hsla(0 0% 0% / 0.4);
+}
+
+/* number box with its label underneath */
+.pcFieldWrap { display: inline-flex; flex-direction: column; align-items: center; }
+/* these name the boxes above them, so they have to be read, not sensed */
+.pcFieldLab { font-size: 76%; color: var(--font-white-1); padding-top: 0.15em; }
+.pcChkBox { padding-left: 0.4em; }
+.pcSaveRow { padding-bottom: 0.5em; }
+.profileMiniBtn.pcSaveBtn { background-color: hsl(140 40% 30%); border-color: hsl(140 35% 42%); color: hsl(140 25% 92%); }
+.profileMiniBtn.pcSaveBtn:hover:not(:disabled) { background-color: hsl(140 44% 36%); }
 .pcGlyph { font-size: 115%; }
 .pcBody { color: var(--font-white-2); }
-.pcPos { color: var(--font-white-3); font-family: var(--font-family-mono), monospace; font-size: 92%; }
+.pcPos { color: var(--font-white-2); font-family: var(--font-family-mono), monospace; font-size: 92%; }
 .pcRetro { color: hsl(15 70% 62%); font-size: 88%; }
-.pcHouse { color: var(--font-white-4); font-size: 84%; }
+.pcHouse { color: var(--font-white-2); font-size: 84%; }
 
 .pcTransitList { display: flex; flex-direction: column; gap: 0.12em; }
-.pcTransit { display: flex; align-items: baseline; gap: 0.35em; font-size: 86%; flex-wrap: wrap; }
+.pcTransit { display: flex; align-items: baseline; gap: 0.35em; font-size: 86%; flex-wrap: wrap; cursor: help; }
 .pcAspect { font-weight: 600; }
-.pcOrb { color: var(--font-white-4); font-family: var(--font-family-mono), monospace; font-size: 88%; margin-left: auto; }
+.pcOrb { color: var(--font-white-2); font-family: var(--font-family-mono), monospace; font-size: 88%; margin-left: auto; }
+
+/* ===================== Friends =====================
+   Reuses .profileRow, .profileList and .profileMiniBtn so a friend, a saved
+   phrase and a leaderboard entry are visibly the same kind of thing. Only
+   what is genuinely new to this tab is defined here. */
+
+/* Icon beside the word, not above it, and at text size rather than a size
+   that makes the row read as a toolbar of pictures. The icons are given a
+   fixed width so they line up down the column whatever glyph is in them -
+   emoji have wildly different advance widths, and without this the labels
+   stagger. */
+.frTabs { display: flex; gap: 0.25em; padding-bottom: 0.7em; flex-wrap: wrap; }
+.intBtn3.frTab {
+	width: auto;
+	flex: 1 1 auto;
+	min-width: 0;
+	margin: 0;
+	padding: 0.3em 0.55em;
+	position: relative;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	gap: 0.35em;
+	line-height: 1.3em;
+	transition: color 0.15s ease, background-color 0.15s ease;
+}
+.frTabIcon {
+	font-size: 95%;
+	line-height: 1;
+	width: 1.15em;
+	text-align: center;
+	flex: 0 0 auto;
+}
+.frTabLab { font-size: 84%; overflow: hidden; text-overflow: ellipsis; }
+.intBtn3.frTab.frTabOn { background-color: var(--btn-active-accent); color: var(--font-white-1); font-weight: 600; }
+/* the site's green, the same one the back button and Find Matches use */
+.intBtn3.frTab:hover { color: hsl(140 60% 66%); border-color: hsl(140 45% 45%); }
+@media (prefers-reduced-motion: reduce) { .intBtn3.frTab { transition: none; } }
+@media (max-width: 420px) { .frTabLab { display: none; } .frTabIcon { font-size: 110%; width: auto; } }
+
+/* the count of requests waiting, on the section button and inline in headings */
+/* Every unread/new indicator in the app - chat, friend requests, the Social
+   tab's own total - is this same green, matching .frTabChatGlow's glow and
+   the calculator's other "something is new" colours (--notif-green). Red is
+   reserved for errors, warnings and destructive actions, never a count. */
+.frBadge {
+	display: inline-block;
+	margin-left: 0.4em;
+	position: relative;
+	min-width: 1.35em;
+	padding: 0 0.3em;
+	border-radius: 999px;
+	background-color: var(--notif-green);
+	color: #fff;
+	font-size: 78%;
+	font-weight: 700;
+	line-height: 1.45em;
+	text-align: center;
+}
+.frBadgeInline { vertical-align: middle; }
+/* the Friends tab itself, when something is waiting */
+.profileTab.profileTabAlert { border-color: var(--notif-green); color: var(--notif-green-text); }
+
+/* Chats' own small header - Inbox/Archived as a light filter strip, rather
+   than a second full toolbar row sitting under the membership tabs and the
+   Chats/Discover/Friends row above it. No title here: the Chats/Discover/
+   Friends button above is already the title. */
+.frChatsHead {
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 0.6em;
+	padding-bottom: 0.6em;
+}
+.frChatsFilters { display: flex; align-items: baseline; gap: 0.4em; }
+.frChatsDot { color: var(--font-white-4); }
+.frChatsFilter {
+	font-size: 82%;
+	color: var(--font-white-3);
+	cursor: pointer;
+}
+.frChatsFilter:hover { color: var(--font-white-1); }
+.frChatsFilter.frChatsFilterOn { color: var(--font-white-1); font-weight: 700; text-decoration: underline; }
+.frChatsFilterBadge {
+	display: inline-block;
+	min-width: 1.2em;
+	padding: 0 0.35em;
+	border-radius: 999px;
+	background-color: var(--notif-green);
+	color: #fff;
+	font-size: 88%;
+	font-weight: 700;
+	text-align: center;
+}
+
+.frToolbar { display: flex; align-items: center; gap: 0.3em; flex-wrap: wrap; padding-bottom: 0.6em; }
+.frToolLab { font-size: 80%; color: var(--font-white-3); font-weight: 600; padding-right: 0.2em; }
+.intBtn3.frChip { width: auto; margin: 0; padding: 0.18em 0.7em; font-size: 82%; }
+.intBtn3.frChip.frChipOn { background-color: var(--btn-active-accent); color: var(--font-white-1); font-weight: 600; }
+
+.frSectionTitle {
+	font-size: 85%;
+	font-weight: 600;
+	color: var(--font-white-1);
+	padding: 0.7em 0 0.4em 0;
+}
+/* separates pending requests from the friends list below them (Friends tab,
+   now that Requests lives inside it) - only present when there was something
+   waiting to separate from */
+.frReqDivider {
+	border-top: 1px solid var(--separator-accent2);
+	margin: 0.8em 0;
+}
+/* one row of the Reactions strip (frNotifRowHtml) - reuses .frRow's unread
+   tint/hover, same as a chat thread row */
+.frNotifText { flex: 1 1 auto; min-width: 0; font-size: 92%; }
+.frNotifText b { color: var(--font-white-1); }
+.frNewsBar { display: flex; justify-content: flex-end; padding-bottom: 0.5em; }
+/* the collapsed default for Requests - a strip, not a section, so "Sent by
+   you" (usually short or empty) does not sit permanently open above the
+   friends list people actually came here for */
+.frReqStrip {
+	display: flex;
+	align-items: center;
+	gap: 0.6em;
+	padding: 0.5em 0.6em;
+	background-color: var(--input-bg-accent);
+	border: 1px solid var(--border-dark-accent);
+	cursor: pointer;
+}
+.frReqStrip:hover { background-color: var(--btn-hover-accent); }
+.frReqStripLabel { font-size: 85%; font-weight: 700; color: var(--font-white-1); }
+.frReqStripItem { font-size: 82%; color: var(--font-white-3); }
+.frReqStripArrow { margin-left: auto; color: var(--font-white-4); font-size: 80%; }
+
+.frRow { align-items: center; gap: 0.5em; }
+.frAvatar {
+	width: 26px; height: 26px;
+	border-radius: 50%;
+	object-fit: cover;
+	flex: 0 0 auto;
+	background-color: var(--btn-bg-accent);
+}
+.frAvatarFallback {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 80%;
+	font-weight: 700;
+	color: var(--font-white-2);
+}
+.frAvatarBig { width: 56px; height: 56px; font-size: 150%; }
+
+.frWho { flex: 1 1 auto; min-width: 0; cursor: pointer; }
+.frWho:hover .frName { color: var(--font-white-1); text-decoration: underline; }
+.frName { display: block; color: var(--font-white-2); font-weight: 600; }
+/* the handle and the join date are read on purpose, not skipped */
+.frSub { display: block; font-size: 80%; color: var(--font-white-3); }
+
+/* Presence is a timestamp, not a flag, so this is "seen in the last five
+   minutes" rather than a state a closed browser could leave stuck on. */
+.frDot {
+	display: inline-block;
+	width: 7px; height: 7px;
+	border-radius: 50%;
+	margin-left: 0.45em;
+	vertical-align: middle;
+	background-color: var(--font-white-4);
+}
+.frDot.frDotOn { background-color: hsl(140 85% 55%); box-shadow: 0 0 5px hsla(140 90% 60% / 0.7); }
+
+.frActions { display: flex; align-items: center; gap: 0.3em; flex: 0 0 auto; }
+
+/* View/Remove/Block, tucked behind a menu rather than sitting in the row -
+   Message is the thing you actually do to a friend often; the rest is rare
+   enough, and Remove/Block final enough, that a friends list should not read
+   as a row of people you might be about to lose. */
+.frCardMenu { position: relative; }
+.profileMiniBtn.frCardMenuBtn { padding: 0.1em 0.5em; font-weight: 700; letter-spacing: 0.05em; }
+.frCardMenuList {
+	position: absolute;
+	right: 0;
+	top: calc(100% + 4px);
+	z-index: 30;
+	display: flex;
+	flex-direction: column;
+	min-width: 9em;
+	background-color: var(--menu-bg-accent);
+	border: 1px solid var(--border-accent);
+	box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+}
+.frCardMenuItem {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	text-align: left;
+	padding: 0.45em 0.8em;
+	font-size: 84%;
+	font-family: var(--font-family), "Arial", sans-serif;
+	color: var(--font-white-2);
+	background: none;
+	border: none;
+	cursor: pointer;
+}
+.frCardMenuItem:hover { background-color: var(--btn-hover-accent); color: var(--font-white-1); }
+.frCardMenuItem.frCardMenuDanger { color: hsl(5 70% 68%); }
+.frCardMenuItem.frCardMenuDanger:hover { background-color: hsla(5 60% 45% / 0.3); }
+.profileMiniBtn.frAdd { background-color: hsl(140 40% 30%); border-color: hsl(140 35% 42%); color: hsl(140 25% 92%); }
+.profileMiniBtn.frAdd:hover:not(:disabled) { background-color: hsl(140 44% 36%); }
+.profileMiniBtn.frAccept { background-color: hsl(140 40% 30%); border-color: hsl(140 35% 42%); color: hsl(140 25% 92%); }
+.profileMiniBtn.frAccept:hover:not(:disabled) { background-color: hsl(140 44% 36%); }
+
+.frBack { padding-bottom: 0.5em; }
+.frProfile { padding-bottom: 0.4em; }
+.frProfileHead { display: flex; align-items: center; gap: 0.8em; padding-bottom: 0.8em; }
+.frProfileWho { flex: 1 1 auto; min-width: 0; }
+.frProfileName { font-size: 118%; font-weight: 600; color: var(--font-white-1); }
+.frProfileActions { flex: 0 0 auto; display: flex; gap: 0.3em; }
+
+.frStats { display: flex; gap: 0.5em; flex-wrap: wrap; }
+.frStat {
+	flex: 1 1 5.5em;
+	background-color: var(--input-bg-accent);
+	border: 1px solid var(--border-dark-accent);
+	padding: 0.5em 0.4em;
+	text-align: center;
+}
+.frStatVal { font-family: var(--font-family-mono), monospace; font-size: 125%; font-weight: 700; color: var(--font-white-1); }
+/* --font-white-4 is the shade for things you are meant to skip; a stat's label
+   is the half that says what the number means */
+.frStatLab { font-size: 74%; color: var(--font-white-3); padding-top: 0.15em; }
+
+.frBadgeRow { display: flex; gap: 0.35em; flex-wrap: wrap; }
+.frAward {
+	font-size: 80%;
+	color: var(--font-white-2);
+	background-color: var(--btn-bg-accent);
+	border: 1px solid var(--border-accent);
+	padding: 0.2em 0.55em;
+	cursor: help;
+}
+
+.frToggleRow { padding: 0.25em 0; }
+.frToggleHint { font-size: 78%; color: var(--font-white-4); padding-left: 1.9em; }
+
+/* ---- chat ---- */
+
+.profileMiniBtn.frMsg { background-color: hsl(210 40% 32%); border-color: hsl(210 35% 45%); color: hsl(210 25% 92%); }
+.profileMiniBtn.frMsg:hover:not(:disabled) { background-color: hsl(210 44% 38%); }
+
+/* one line of preview, cut rather than wrapped: a thread list is a list of
+   people, not a list of messages. Sized well past a caption now - the
+   message is the actual content of an inbox row, and used to read as a
+   footnote under the name instead of the second half of the headline. Read
+   and unread share this size; only colour, weight and glow tell them apart. */
+.frPreview {
+	display: block;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+	font-size: 118%;
+	font-weight: 400;
+	color: var(--font-white-2);
+	margin-top: 0.15em;
+}
+
+.frChatHead {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	padding-bottom: 0.5em;
+	border-bottom: 1px solid var(--separator-accent2);
+}
+.frChatWho { flex: 1 1 auto; font-weight: 600; color: var(--font-white-1); }
+.frChatHeadActions { display: flex; gap: 0.3em; flex: 0 0 auto; }
+
+/* Following stays green permanently, not just a text change - the same
+   green the rest of the app already uses for "this is on" (frSwitchOn,
+   .frDotOn). The pulse below only plays the moment it turns on. */
+.frForumFollowBtn.frForumFollowOn {
+	background: hsla(140 65% 42% / 0.22);
+	border-color: hsl(140 80% 50%);
+	color: hsl(140 85% 78%);
+}
+.frForumFollowBtn.frForumFollowOn:hover { background: hsla(140 65% 42% / 0.32); }
+@keyframes frForumFollowPulse {
+	0%   { box-shadow: 0 0 0 0 hsla(140 90% 55% / 0.65); }
+	100% { box-shadow: 0 0 0 10px hsla(140 90% 55% / 0); }
+}
+.frForumFollowBtn.frForumFollowFlash { animation: frForumFollowPulse 0.6s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+	.frForumFollowBtn.frForumFollowFlash { animation: none; }
+}
+
+/* Report glows red on hover - the one destructive-feeling action in this
+   header, same register as .profileMiniDanger elsewhere, but only on
+   hover rather than a permanent red button, since reporting is not the
+   default expectation the way Follow or Post are. */
+.frForumReportBtn:hover {
+	background: hsla(5 70% 50% / 0.18);
+	border-color: hsl(5 75% 58%);
+	color: hsl(5 85% 82%);
+	box-shadow: 0 0 8px hsla(5 80% 55% / 0.35);
+}
+/* armed by a first click (frForumReportTopic's confirm step) - reads as
+   "one more click and this sends" before the actual report dialog opens */
+.frForumReportBtn.frForumReportArmed {
+	background: hsla(5 70% 50% / 0.22);
+	border-color: hsl(5 80% 60%);
+	color: hsl(5 90% 85%);
+}
+
+.frChatLog {
+	height: 260px;
+	overflow-y: auto;
+	padding: 0.6em 0.2em;
+	display: flex;
+	flex-direction: column;
+	gap: 0.35em;
+}
+
+.frMsgRow { display: flex; flex-direction: column; align-items: flex-start; max-width: 100%; }
+.frMsgRow.frMsgMine { align-items: flex-end; }
+
+/* Holds the bubble and, on your own messages, the delete ×. Exists so the
+   × can anchor to the BUBBLE's top-right corner: .frMsgRow is as wide as
+   the whole log, so anchoring to the row would strand the × far from a
+   narrow message and overlap the username line above it. Carries the
+   bubble's max-width so the pair are measured as one. */
+.frBubbleWrap { position: relative; max-width: 78%; }
+.frBubbleWrap .frBubble { max-width: 100%; }
+/* room for the delete × in the corner, so it never lands on the text.
+   Only your own messages carry one (frMsgDeleteHtml is rendered for
+   m.mine only), which is exactly what .frMsgMine marks. */
+.frMsgMine .frBubble { padding-right: 1.9em; }
+
+/* ---- delete your own message (Forum + Chat) ----
+   frMsgDeleteHtml (calc/social-reply.js). Absolutely positioned, so it
+   never takes part in the layout and cannot push the username, bubble,
+   action bar or timestamp around - nothing shifts when it appears on
+   hover.
+
+   Seated just INSIDE the bubble's top-right corner rather than nudged
+   outside it: .frChatLog scrolls (overflow auto both ways), so anything
+   hanging past the bubble's edge on a right-aligned message is clipped
+   by the scroll container and can provoke a horizontal scrollbar. The
+   matching padding-right on .frMsgMine .frBubble above keeps it off the
+   text instead.
+
+   Quiet until the message is hovered, like .frMsgFlag: deleting is not
+   an everyday action and should not sit in the corner of every message
+   of yours competing with Reply. */
+.frMsgDelete {
+	position: absolute;
+	top: 3px;
+	right: 3px;
+	z-index: 2;
+	width: 22px;
+	height: 22px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	font-size: 105%;
+	line-height: 1;
+	color: var(--font-white-4);
+	background: var(--btn-bg-accent);
+	border: 1px solid var(--border-dark-accent);
+	border-radius: 4px;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 0.15s ease, color 0.12s ease, background-color 0.12s ease;
+}
+.frMsgRow:hover .frMsgDelete, .frMsgDelete:focus-visible { opacity: 1; }
+.frMsgDelete:hover { color: hsl(5 80% 72%); border-color: hsl(5 70% 55%); background: hsla(5 70% 40% / 0.35); }
+.frMsgDelete:focus-visible { outline: 1px solid var(--focus-outline); outline-offset: 1px; }
+/* armed by profileConfirmClick - now reading "Sure?", so it needs room for
+   a word rather than a single glyph, and should be unmistakable */
+.frMsgDelete.profileArmed {
+	opacity: 1;
+	width: auto;
+	padding: 0 0.5em;
+	font-size: 72%;
+	font-weight: 700;
+	text-transform: uppercase;
+	color: hsl(5 95% 88%);
+	background: hsla(5 75% 45% / 0.85);
+	border-color: hsl(5 85% 65%);
+}
+/* no hover on touch, so it has to be permanently visible there - and big
+   enough to hit, without becoming the loudest thing on the message */
+@media (hover: none) {
+	.frMsgDelete { opacity: 0.55; width: 32px; height: 32px; }
+}
+@media (prefers-reduced-motion: reduce) { .frMsgDelete { transition: none; } }
+
+.frBubble {
+	max-width: 78%;
+	padding: 0.5em 0.75em;
+	background-color: var(--btn-bg-accent);
+	border: 1px solid var(--border-dark-accent);
+	color: var(--font-white-2);
+	font-size: 102%;
+	line-height: 1.45em;
+	/* a long unbroken string is the one way text can still break a layout */
+	overflow-wrap: anywhere;
+	white-space: normal;
+}
+/* a message that just arrived (frChatLogHtml's newIds, set by the poll in
+   frStartChatPoll) gets one pass of a green highlighter, fading back to the
+   ordinary bubble over a few seconds - marks "this just happened" without
+   staying lit forever, and never applies to your own messages, which you
+   already know you sent. */
+.frMsgNew .frBubble { animation: frMsgHighlight 3s ease-out forwards; }
+@keyframes frMsgHighlight {
+	0%   { background-color: hsla(140 85% 45% / 0.55); border-color: hsl(140 70% 50%); box-shadow: 0 0 10px hsla(140 85% 55% / 0.4); }
+	100% { background-color: var(--btn-bg-accent); border-color: var(--border-dark-accent); box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.frMsgNew .frBubble { animation: none; background-color: hsla(140 85% 45% / 0.3); }
+}
+.frMsgMine .frBubble {
+	background-color: hsl(210 38% 28%);
+	border-color: hsl(210 30% 38%);
+	color: hsl(210 20% 94%);
+}
+/* An edge on the outer side, so which way a message faces survives a bubble
+   wide enough that its position no longer says. Colour alone is not enough on
+   a phone held at arm's length. */
+.frMsgRow .frBubble { border-left: 3px solid var(--font-white-4); }
+.frMsgMine .frBubble { border-left: 1px solid hsl(210 30% 38%); border-right: 3px solid hsl(210 55% 62%); }
+/* Message timestamps were --font-white-4, the dimmest step in the ramp,
+   which at 72% on a near-black background was legible only if you went
+   looking for it. Now --font-white-2, the same colour the message body
+   itself uses (.frBubble), so "14h ago" reads at a glance. Size and
+   placement are unchanged - this was a contrast problem, not a layout
+   one. Shared by Forum and Chat, so both get it. */
+.frMsgWhen { font-size: 72%; color: var(--font-white-2); padding: 0.1em 0.2em; }
+
+.frChatCompose { display: flex; gap: 0.4em; align-items: flex-end; padding-top: 0.5em; }
+.frChatBox {
+	flex: 1 1 auto;
+	resize: vertical;
+	min-height: 2.4em;
+	max-height: 8em;
+	box-sizing: border-box;
+	padding: 0.4em 0.5em;
+	font-family: var(--font-family), "Arial", sans-serif;
+	font-size: 90%;
+	color: var(--font-white-1);
+	background-color: var(--input-bg-accent);
+	border: 1px solid var(--border-accent);
+	outline: none;
+}
+.frChatBox:focus { border-color: var(--focus-outline); }
+.profileMiniBtn.frChatSend { flex: 0 0 auto; align-self: stretch; padding: 0 1em; }
+
+/* ---- forum ---- */
+
+/* Header: name/subtitle/activity line on the left, the one prominent green
+   action on the right - filled and glowing rather than the same faint
+   outlined button every other secondary action in this app uses, since
+   starting a topic is the whole point of being here, not one option among
+   several. */
+.frForumHead2 { padding-bottom: 0.6em; border-bottom: 1px solid var(--border-dark-accent); margin-bottom: 0.5em; }
+.frForumHeadTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.8em; flex-wrap: wrap; }
+.frForumHeadTitle { font-size: 118%; font-weight: 700; color: var(--font-white-1); }
+.frForumHeadSub { font-size: 82%; color: var(--font-white-3); padding-top: 0.15em; }
+.frForumActivity { font-size: 76%; color: hsl(140 75% 62%); padding-top: 0.5em; }
+.frForumStartBtn {
+	flex: 0 0 auto;
+	background: hsl(140 80% 45%);
+	color: hsl(140 95% 8%);
+	border: 1px solid hsl(140 85% 55%);
+	font-weight: 700;
+	font-size: 92%;
+	padding: 0.5em 0.9em;
+	cursor: pointer;
+	box-shadow: 0 0 10px hsla(140 85% 55% / 0.35);
+	transition: background-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
+}
+.frForumStartBtn:hover { background: hsl(140 85% 52%); box-shadow: 0 0 16px hsla(140 90% 55% / 0.55); transform: translateY(-1px); }
+.frForumStartBtn:active { transform: translateY(0); }
+
+/* Small compact tabs, not buttons - a thin underline for the active one,
+   same font as the rest of the site's UI text rather than a distinct
+   monospace treatment. */
+.frForumFilterBar { display: flex; gap: 0.2em; padding-bottom: 0.5em; flex-wrap: wrap; }
+.frForumFilterTab {
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	color: var(--font-white-3);
+	font-size: 82%;
+	padding: 0.2em 0.55em 0.15em 0.55em;
+	cursor: pointer;
+	transition: color 0.12s ease, border-color 0.12s ease;
+}
+.frForumFilterTab:hover { color: var(--font-white-1); }
+.frForumFilterTab.frForumFilterOn { color: hsl(140 85% 65%); border-bottom-color: hsl(140 85% 55%); }
+
+.frForumCompose {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4em;
+	padding: 0.6em;
+	margin-bottom: 0.6em;
+	background: hsl(0 0% 100% / 0.03);
+	border: 1px solid var(--border-dark-accent);
+}
+.frForumComposeRow { display: flex; align-items: center; gap: 0.6em; }
+/* who posted, above their bubble - a forum reply needs the name every time
+   (unlike a two-person chat, where "mine or not" already says who), except
+   on your own, which .frMsgMine already sets apart by side and colour */
+.frForumMsgWho { font-size: 76%; font-weight: 600; color: var(--font-white-3); padding: 0 0.2em 0.15em 0.2em; display: flex; align-items: center; }
+/* a sender's name, clickable through to their profile (frOpenProfile) -
+   used both here (frForumMsgWho) and in a topic row's "Started by" line */
+.frForumWhoLink { cursor: pointer; }
+.frForumWhoLink:hover { color: var(--font-white-1); text-decoration: underline; }
+/* One action bar under a message's bubble, in BOTH Forum and Chat: in the
+   Forum the four reactions (profileChipReactionsHtml, shared with Leaders -
+   this only adds its own spacing here, not new button styling for that
+   part) plus Reply, all the same height; in Chat, Reply plus the report
+   flag. The explicit height on .profileReactBtn is scoped to just this
+   bar - Leaders' own reaction strip keeps its usual sizing. */
+.frMsgActionBar { display: flex; align-items: center; gap: 0.4em; padding: 0.3em 0.2em 0; flex-wrap: wrap; }
+.frMsgActionBar .profileReactBtn { height: 26px; }
+/* profileChipReact carries a padding-top for its original home under a
+   Leaders/Saved phrase row. In here the bar already provides that spacing,
+   and the extra padding made the chip taller than the Reply button beside
+   it, sitting the four reactions a couple of pixels lower than Reply -
+   visible as a slightly ragged row. Scoped to this bar only, so the
+   Leaders and Saved strips keep their own spacing untouched. */
+.frMsgActionBar .profileChipReact { padding-top: 0; }
+/* your own messages in Chat sit against the right edge - their action bar
+   goes with them rather than staying left under a right-aligned bubble */
+.frMsgMine .frMsgActionBar { justify-content: flex-end; }
+
+/* Reply: neutral at rest, green only on hover - a wide rectangular button
+   the same height as the reaction buttons beside it, bold uppercase text,
+   always fully visible and readable (unlike the old hover-only icon this
+   replaced), but the green itself is reserved for hover rather than
+   permanent, so it does not outshout the reactions next to it at rest.
+   Identical in Forum and Chat: same builder (frReplyBtnHtml,
+   calc/social-reply.js), same class, same rules, so the two cannot drift. */
+.frMsgReplyBtn {
+	height: 26px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.3em;
+	padding: 0 0.75em;
+	font-size: 76%;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+	color: var(--font-white-3);
+	background: hsl(0 0% 100% / 0.05);
+	border: 1px solid var(--border-dark-accent);
+	border-radius: 5px;
+	cursor: pointer;
+	white-space: nowrap;
+	transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.frMsgReplyBtn:hover {
+	background: hsla(140 75% 40% / 0.4);
+	border-color: hsl(140 90% 62%);
+	color: hsl(140 95% 85%);
+}
+.frMsgReplyBtn:focus-visible { outline: 1px solid var(--focus-outline); outline-offset: 2px; }
+/* armed: this is the message currently being replied to. The label itself
+   changes to REPLYING (frReplyMarkActive) rather than relying on the
+   green alone, so the state is legible without colour vision. */
+.frMsgReplyBtn.frMsgReplyBtnOn {
+	background: hsla(140 75% 40% / 0.55);
+	border-color: hsl(140 90% 62%);
+	color: hsl(140 95% 90%);
+	box-shadow: 0 0 0 1px hsla(140 90% 62% / 0.35);
+}
+@media (max-width: 620px) {
+	/* 44px minimum touch target - grown together with the reaction buttons
+	   next to it so the whole bar still reads as one consistent row rather
+	   than Reply suddenly looming over four small pills */
+	.frMsgActionBar .profileReactBtn, .frMsgReplyBtn { height: 44px; }
+	.frMsgReplyBtn { padding: 0 1em; font-size: 82%; }
+}
+/* the literal substring @here, highlighted wherever it appears in a posted
+   reply (forumRenderBody, calc/forum-tab.js) */
+.forumHereMention { color: hsl(140 85% 62%); font-weight: 700; }
+/* a @Name mention (forumUserMention modifier) is also a click-through to
+   their profile - @here is not, so this cursor/hover only applies here */
+.forumUserMention { cursor: pointer; }
+.forumUserMention:hover { text-decoration: underline; }
+
+/* the @mention autocomplete - flows in normal document order right under
+   the compose box rather than a caret-positioned floating popup (no
+   existing pattern in this app for that - Discover's search and the
+   Cyphers search box both replace an inline panel the same simple way) */
+.frMentionDropdown {
+	border: 1px solid var(--border-dark-accent);
+	background: var(--breakdown-bg-accent);
+	margin-top: 0.3em;
+	max-height: 160px;
+	overflow-y: auto;
+}
+.frMentionOpt { padding: 0.4em 0.6em; font-size: 88%; cursor: pointer; }
+.frMentionOpt:hover { background: var(--btn-hover-accent); color: var(--font-white-1); }
+
+/* ---- shared reply preview (Forum + Chat) ----
+   Built by frReplyQuoteHtml (calc/social-reply.js) and used unchanged by
+   both surfaces. Two lines - who on top, what they said underneath -
+   rather than the one squeezed nowrap line this replaced, which read as
+   metadata rather than as context.
+
+   The hierarchy that matters: this is clearly readable but plainly
+   secondary to the .frBubble below it. Smaller than the message (88% vs
+   102%) but nowhere near fine print, dimmer but still high enough
+   contrast to read at a glance, and capped at two lines so a quoted
+   paragraph can never out-weigh the reply answering it.
+
+   Clicking (or Enter/Space when focused) scrolls to and pulses the
+   quoted message - frReplyJumpTo, reusing the same .frMsgNew highlight
+   an arriving message and an @here notification jump already use. */
+.frReplyQuote {
+	display: flex;
+	align-items: stretch;
+	gap: 0.5em;
+	max-width: 78%;
+	margin-bottom: 0.25em;
+	padding: 0.05em 0.2em;
+	cursor: pointer;
+	overflow: hidden;
+	background: none;
+	border: none;
+	transition: opacity 0.12s ease;
+	opacity: 0.82;
+}
+.frReplyQuote:hover, .frReplyQuote:focus-visible { opacity: 1; background: hsla(140 65% 42% / 0.12); }
+.frReplyQuote:focus-visible { outline: 1px solid var(--focus-outline); outline-offset: 2px; }
+/* the connector: a green vertical rule tying the quote to the bubble
+   under it, so the pair reads as one unit rather than two stacked
+   things - the same green the composer strip uses for the armed reply,
+   so "this is a reply" is one colour throughout Social. Muted at rest so
+   it marks the relationship without competing with the message, full
+   strength on hover once it is the thing being pointed at. */
+.frReplyQuoteConnector {
+	flex: 0 0 auto;
+	width: 3px;
+	border-radius: 2px;
+	background: hsl(140 80% 50%);
+	opacity: 0.65;
+}
+.frReplyQuote:hover .frReplyQuoteConnector, .frReplyQuote:focus-visible .frReplyQuoteConnector { opacity: 1; }
+.frReplyQuoteMain { display: flex; flex-direction: column; min-width: 0; gap: 0.05em; }
+.frReplyQuoteWho {
+	font-size: 80%;
+	font-weight: 700;
+	color: var(--font-white-2);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* clamped to two lines: enough to recognise the message, never enough to
+   compete with the reply itself */
+.frReplyQuoteBody {
+	font-size: 88%;
+	line-height: 1.35em;
+	color: var(--font-white-3);
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	overflow-wrap: anywhere;
+}
+/* a quote whose target is gone: stated plainly in the same slot, and not
+   clickable-looking, since there is nothing to jump to. The connector
+   drops to neutral grey - the green means "there is a message over
+   there", which is exactly what is no longer true. */
+.frReplyQuoteGone { cursor: default; font-style: italic; }
+.frReplyQuoteGone .frReplyQuoteConnector { background: var(--font-white-4); opacity: 0.5; }
+.frReplyQuoteGone:hover { opacity: 0.82; background: none; }
+.frReplyQuoteGone:hover .frReplyQuoteConnector { opacity: 0.5; }
+/* mirrored for your own messages in Chat, which sit against the right
+   edge - the connector belongs on the side the bubble is anchored to */
+.frMsgMine .frReplyQuote { flex-direction: row-reverse; }
+.frMsgMine .frReplyQuoteMain { align-items: flex-end; text-align: right; }
+@media (max-width: 620px) { .frReplyQuote { max-width: 64%; } }
+@media (prefers-reduced-motion: reduce) { .frReplyQuote { transition: none; } }
+
+/* ---- shared composer strip (Forum + Chat) ----
+   frReplyBarHtml (calc/social-reply.js). Active only while a reply is
+   armed, so it is never a guess which message is about to be answered.
+   Carries the quoted snippet as well as the name - a name alone does not
+   identify which of that person's messages was picked. */
+.frReplyBar {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	padding: 0.35em 0.5em;
+	margin-bottom: 0.3em;
+	background: hsla(140 65% 42% / 0.09);
+	border-left: 3px solid hsl(140 80% 50%);
+	font-size: 82%;
+	color: var(--font-white-2);
+}
+.frReplyBarIcon { flex: 0 0 auto; color: hsl(140 80% 60%); font-weight: 700; }
+.frReplyBarText { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.1em; }
+.frReplyBarWho { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.frReplyBarWho b { color: var(--font-white-1); }
+.frReplyBarSnippet {
+	font-size: 92%;
+	color: var(--font-white-3);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+/* × rather than a labelled Cancel: it sits at the end of a strip that
+   already says what it is, and this keeps the strip to one compact line.
+   Cancelling never clears what has been typed - it only disarms the
+   reply. Sized for a finger on touch (see the mobile block below). */
+.frReplyBarCancel {
+	flex: 0 0 auto;
+	width: 24px;
+	height: 24px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 130%;
+	line-height: 1;
+	color: var(--font-white-3);
+	background: none;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	cursor: pointer;
+	transition: color 0.12s ease, background-color 0.12s ease;
+}
+.frReplyBarCancel:hover { color: var(--font-white-1); background: hsl(0 0% 100% / 0.08); }
+.frReplyBarCancel:focus-visible { outline: 1px solid var(--focus-outline); outline-offset: 1px; }
+@media (max-width: 620px) { .frReplyBarCancel { width: 40px; height: 40px; } }
+@media (prefers-reduced-motion: reduce) { .frReplyBarCancel { transition: none; } }
+
+/* ---- forum topic feed row ---- */
+/* A discussion-feed row, not an isolated boxy card: fine separators between
+   topics (frForumFeed's own border-top plus each row's border-bottom),
+   square corners throughout (no border-radius on the row itself) to stay
+   in the app's retro-terminal register rather than drift toward rounded
+   social-media cards. Title leads, large and bold, with [NEW] attached
+   right beside it; creator/time is one small line under that (the name is
+   its own clickable link, .frForumWhoLink, through to their profile);
+   reply count and a chevron sit on the right - no avatar, kept deliberately
+   text-only. The opening message's own preview text used to sit between
+   title and creator line, competing with the title for the same weight -
+   dropped from the list entirely (still shown once the topic itself is
+   open, see frRenderForumThread). */
+.frForumFeed { border-top: 1px solid var(--border-dark-accent); }
+/* align-items: center, not flex-start - the main block is a single title
+   line now that the "Started by …" second line is gone, so top-aligning
+   the meta group against it left it sitting high and reading as though a
+   line had been deleted from under it. Centred, the row is deliberately
+   one line. */
+.frForumRow2 {
+	display: flex;
+	align-items: center;
+	gap: 0.7em;
+	padding: 0.7em 0.5em;
+	border-bottom: 1px solid var(--border-dark-accent);
+	border-left: 3px solid transparent;
+	cursor: pointer;
+	transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+/* a subtle tint and a lit accent bar for a topic with something unread -
+   not a loud highlight, just enough to read as "different from the rest"
+   at a glance down the list */
+.frForumRow2.frForumRowUnread { background: hsla(140 65% 42% / 0.07); border-left-color: hsl(140 80% 50%); }
+.frForumRow2:hover {
+	background: hsla(0 0% 100% / 0.045);
+	border-left-color: hsl(140 85% 55%);
+	transform: translateY(-2px);
+	box-shadow: 0 2px 10px hsla(140 85% 55% / 0.16), inset 0 0 0 1px hsla(140 85% 55% / 0.22);
+}
+.frForumRow2.frForumRowUnread:hover { background: hsla(140 65% 42% / 0.13); }
+@media (prefers-reduced-motion: reduce) {
+	.frForumRow2 { transition: background-color 0.12s ease, border-color 0.12s ease; }
+	.frForumRow2:hover { transform: none; }
+}
+
+.frForumRowMain { flex: 1 1 auto; min-width: 0; }
+.frForumRowTitleLine { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.35em; }
+.frForumRowTitle { font-size: 110%; font-weight: 700; color: var(--font-white-1); overflow-wrap: anywhere; }
+/* [NEW] / [NEW · 3] - green, attached beside the title (same flex line, so
+   it wraps with the title rather than floating off on its own), never for
+   the topic's own latest message being yours (forum_topics_list already
+   excludes your own messages from unread_count server-side) */
+.frForumNew {
+	display: inline-block;
+	padding: 0.05em 0.4em;
+	font-size: 66%;
+	font-weight: 800;
+	letter-spacing: 0.03em;
+	color: hsl(140 90% 20%);
+	background: hsl(140 85% 55%);
+	border-radius: 3px;
+	white-space: nowrap;
+}
+/* no padding-top any more: it existed to nudge this group down against a
+   two-line main block, and with one line the row centres instead */
+.frForumRowRight {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	font-size: 82%;
+	color: var(--font-white-3);
+	white-space: nowrap;
+}
+/* the creation date sits a step quieter than the reply count next to it:
+   both are facts about the topic, but "how much discussion is in here" is
+   the one people actually scan for */
+/* readable at a glance, matching the message timestamps rather than
+   fading into the row like the chevron next to it */
+.frForumRowDate { color: var(--font-white-2); }
+.frForumRowChevron { font-size: 140%; line-height: 1; color: var(--font-white-4); }
+
+@media (max-width: 620px) {
+	/* the title stays on its own top line; reply count/chevron drop to
+	   their own line underneath instead of squeezing onto the same row */
+	.frForumRow2 { flex-wrap: wrap; }
+	.frForumRowRight { flex: 1 1 100%; justify-content: flex-start; }
+}
+
+.frChatWarn { font-size: 80%; color: var(--font-white-4); min-height: 1.2em; padding-top: 0.25em; }
+.frChatWarn.frChatWarnBad { color: hsl(5 75% 72%); }
+
+/* Mobile: index.html pins the layout viewport to 520px, so this matches on a
+   phone and never on a desktop window.
+   
+   78% of a 465px log leaves 81px of offset - 17% - and at that width a normal
+   sentence fills the bubble and both sides read as centred, which is exactly
+   what they did. 64% doubles the offset to a third of the width, which is
+   unmistakable at a glance. Long messages wrap a line more; being able to tell
+   who said what is worth more than that. */
+@media (max-width: 620px) {
+	.frBubble, .frBubbleWrap { max-width: 64%; }
+	.frBubbleWrap .frBubble { max-width: 100%; }
+	.frChatLog { height: 300px; }
+	/* the action bar under a forum reply is often wider than the bubble
+	   above it, especially now Reply is a full button rather than small
+	   text - capped to match the bubble so it never reads as wider than
+	   (and so not clearly siding with) the message it belongs to; wraps
+	   onto a second line rather than overflowing when it does not fit */
+	.frMsgActionBar { max-width: 64%; }
+}
+
+/* the flag on a chat message: quiet until hovered, loud once armed. Sits
+   in the shared .frMsgActionBar next to REPLY, so it gets a matching
+   height and its own touch target on mobile - deliberately still much
+   quieter than REPLY, since reporting is not an everyday action. */
+.frMsgFlag {
+	cursor: pointer;
+	padding: 0 0.4em;
+	height: 26px;
+	display: inline-flex;
+	align-items: center;
+	color: var(--font-white-4);
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+@media (max-width: 620px) { .frMsgFlag { height: 44px; padding: 0 0.6em; } }
+.frMsgRow:hover .frMsgFlag { opacity: 1; }
+.frMsgFlag:hover { color: hsl(5 75% 70%); }
+.frMsgFlag.frMsgFlagArmed { opacity: 1; color: hsl(5 80% 72%); font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .frMsgFlag { transition: none; } }
+/* touch devices have no hover, so the flag has to be permanently visible */
+@media (hover: none) { .frMsgFlag { opacity: 0.55; } }
+
+/* admin shortcut in the nav row */
+.authNavLink.authNavAdmin { color: hsl(45 85% 72%); }
+
+/* the sort/filter controls above a contributor's published phrases */
+.profileContribSort { display: flex; align-items: center; gap: 0.9em; padding-bottom: 0.5em; flex-wrap: wrap; }
+/* SORT and FILTER as two visually distinct groups rather than one long row -
+   a small caption plus its own chip row, wrapping as a unit on a narrow
+   screen instead of interleaving with the other group's chips */
+.profileSortGroup { display: flex; align-items: center; gap: 0.45em; flex-wrap: wrap; }
+.profileSortGroupLabel {
+	font-size: 68%;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--font-white-3);
+}
+/* every order visible and one tap away, rather than a dropdown you have to
+   open first to see what your choices even are */
+.profileSortChips { display: flex; flex-wrap: wrap; gap: 0.25em; }
+@media (max-width: 620px) {
+	/* the FILTER row (six buttons) is the one that stops fitting on a phone -
+	   scrolls sideways instead of wrapping into a third and fourth line, with
+	   a soft fade at the right edge as the "there's more" hint instead of a
+	   scrollbar competing with the outer page's own */
+	.profileFilterChips {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		padding-bottom: 0.15em;
+		-webkit-mask-image: linear-gradient(to right, black calc(100% - 18px), transparent 100%);
+		mask-image: linear-gradient(to right, black calc(100% - 18px), transparent 100%);
+	}
+	.profileFilterChips .profileSortChip { flex: 0 0 auto; }
+}
+.profileSortChip {
+	font-size: 78%;
+	font-weight: 500;
+	padding: 0.22em 0.55em;
+	background: hsl(0 0% 100% / 0.05);
+	border: 1px solid var(--border-dark-accent);
+	border-radius: 999px;
+	color: var(--font-white-3);
+	cursor: pointer;
+	white-space: nowrap;
+}
+.profileSortChip:hover { background: var(--btn-hover-accent); color: var(--font-white-1); }
+.profileSortChip.profileSortChipOn {
+	background: var(--btn-active-accent);
+	border-color: var(--focus-outline);
+	color: var(--font-white-1);
+	font-weight: 600;
+}
+.profileSectionTitle {
+	font-size: 84%;
+	font-weight: 600;
+	color: var(--font-white-3);
+	padding: 0.9em 0 0.4em 0;
+	border-top: 1px solid var(--separator-accent2);
+	margin-top: 0.6em;
+}
+
+
+/* ---- friends nav: badges and the first-time pip ---- */
+
+.frTab .frBadge {
+	position: absolute;
+	top: 1px;
+	right: 2px;
+	margin: 0;
+	font-size: 68%;
+	line-height: 1.4em;
+	min-width: 1.4em;
+}
+/* Not a count - a nudge. Shown until the section has been opened once, then
+   never again, so it cannot become part of the furniture. */
+.frPip {
+	position: absolute;
+	top: 1px;
+	right: 3px;
+	color: hsl(45 90% 68%);
+	font-size: 78%;
+	animation: frPipGlow 2.4s ease-in-out infinite;
+}
+@keyframes frPipGlow { 0%,100% { opacity: 0.45 } 50% { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .frPip { animation: none; opacity: 0.9 } }
+
+/* ---- one select instead of a row of chips ---- */
+
+.frSelect {
+	font-family: var(--font-family), "Arial", sans-serif;
+	font-size: 82%;
+	color: var(--font-white-1);
+	background-color: var(--input-bg-accent);
+	border: 1px solid var(--border-accent);
+	padding: 0.2em 0.4em;
+	outline: none;
+	max-width: 14em;
+}
+.frSelect:focus { border-color: var(--focus-outline); }
+.frToolCount { font-size: 80%; color: var(--font-white-3); margin-left: auto; }
+
+/* ---- privacy ---- */
+
+.frPrivHead {
+	font-size: 100%;
+	font-weight: 600;
+	color: var(--font-white-1);
+	padding: 1em 0 0.5em 0;
+}
+.frPrivHead:first-child { padding-top: 0.2em; }
+/* the "what others can see" heading plus its master on/off - the button sits
+   on the same line as the heading it governs rather than above the switches,
+   so it reads as one control for the group instead of a sixth switch */
+.frPrivHeadRow { display: flex; align-items: center; justify-content: space-between; gap: 0.6em; }
+.frPrivHeadRow .profileMiniBtn { flex-shrink: 0; }
+.frPrivFoot {
+	font-size: 80%;
+	color: var(--font-white-3);
+	border-top: 1px solid var(--separator-accent2);
+	margin-top: 1em;
+	padding-top: 0.7em;
+	line-height: 1.45em;
+}
+
+/* one question, three answers - a choice, not a filter */
+.frChoice { display: flex; flex-direction: column; gap: 0.35em; }
+.frChoiceCard {
+	display: flex;
+	align-items: center;
+	gap: 0.7em;
+	width: 100%;
+	box-sizing: border-box;
+	text-align: left;
+	font-family: var(--font-family), "Arial", sans-serif;
+	background-color: var(--input-bg-accent);
+	border: 1px solid var(--border-accent);
+	color: var(--font-white-2);
+	padding: 0.6em 0.8em;
+	cursor: pointer;
+	outline: none;
+}
+.frChoiceCard:hover { background-color: var(--btn-hover-accent); }
+.frChoiceCard.frChoiceOn {
+	border-color: hsl(140 50% 48%);
+	background-color: hsla(140 45% 35% / 0.22);
+	color: var(--font-white-1);
+}
+.frChoiceIcon { font-size: 145%; flex: 0 0 auto; line-height: 1; }
+.frChoiceBody { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.frChoiceTitle { font-weight: 600; font-size: 95%; }
+.frChoiceBlurb { font-size: 80%; color: var(--font-white-3); line-height: 1.35em; }
+.frChoiceTick { color: hsl(140 60% 62%); font-weight: 700; font-size: 115%; flex: 0 0 1em; }
+
+/* two per row rather than one long column - see renderAccountPrivacy */
+.frSwitchGrid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.3em;
+}
+@media (max-width: 480px) {
+	.frSwitchGrid { grid-template-columns: 1fr; }
+}
+/* switches: whole row is the target, green on, grey off */
+.frSwitchRow {
+	display: flex;
+	align-items: center;
+	gap: 0.7em;
+	padding: 0.55em 0.7em;
+	margin-bottom: 0.3em;
+	background-color: var(--input-bg-accent);
+	border: 1px solid var(--border-dark-accent);
+	cursor: pointer;
+}
+.frSwitchGrid .frSwitchRow { margin-bottom: 0; }
+.frSwitchRow:hover { background-color: var(--btn-hover-accent); }
+.frSwitchIcon { font-size: 125%; flex: 0 0 auto; line-height: 1; }
+.frSwitchBody { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.frSwitchTitle { font-size: 92%; color: var(--font-white-2); font-weight: 600; }
+.frSwitchRow.frSwitchOn .frSwitchTitle { color: var(--font-white-1); }
+.frSwitchBlurb { font-size: 78%; color: var(--font-white-3); line-height: 1.35em; }
+
+.frSwitch {
+	flex: 0 0 auto;
+	width: 38px;
+	height: 21px;
+	border-radius: 999px;
+	background-color: var(--btn-bg-accent);
+	border: 1px solid var(--border-accent);
+	position: relative;
+	transition: background-color 0.16s ease, border-color 0.16s ease;
+}
+.frSwitchKnob {
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 15px;
+	height: 15px;
+	border-radius: 50%;
+	background-color: var(--font-white-3);
+	transition: transform 0.16s ease, background-color 0.16s ease;
+}
+.frSwitchRow.frSwitchOn .frSwitch {
+	background-color: hsl(140 48% 36%);
+	border-color: hsl(140 45% 50%);
+}
+.frSwitchRow.frSwitchOn .frSwitchKnob { transform: translateX(17px); background-color: #fff; }
+@media (prefers-reduced-motion: reduce) {
+	.frSwitch, .frSwitchKnob { transition: none; }
+}
+
+/* ---- profile: roles and favourite cyphers ---- */
+
+/* The card exactly as other people see it, under "How others see you" - a
+   soft, slow-breathing glow around it rather than a plain box makes it read
+   as a live view through a window, not just another panel of settings, so
+   it's obvious at a glance this is what gets shown, not what you're editing. */
+.frProfilePreview {
+	position: relative;
+	border: 1px solid hsl(140 55% 45% / 0.5);
+	border-radius: 6px;
+	padding: 0.7em;
+	margin-bottom: 0.3em;
+	animation: frProfilePreviewGlow 3.2s ease-in-out infinite;
+}
+@keyframes frProfilePreviewGlow {
+	0%, 100% { box-shadow: 0 0 6px 0 hsla(140 70% 50% / 0.18); border-color: hsl(140 55% 45% / 0.4); }
+	50%      { box-shadow: 0 0 16px 2px hsla(140 80% 55% / 0.4); border-color: hsl(140 70% 55% / 0.75); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.frProfilePreview { animation: none; box-shadow: 0 0 10px 0 hsla(140 70% 50% / 0.25); }
+}
+.frRoleGrid { display: flex; flex-wrap: wrap; gap: 0.3em; }
+.frRole {
+	font-family: var(--font-family), "Arial", sans-serif;
+	font-size: 82%;
+	color: var(--font-white-2);
+	background-color: var(--btn-bg-accent);
+	border: 1px solid var(--border-accent);
+	padding: 0.25em 0.6em;
+	cursor: pointer;
+	outline: none;
+}
+.frRole:hover { background-color: var(--btn-hover-accent); }
+.frRole.frRoleOn {
+	background-color: hsla(140 45% 35% / 0.3);
+	border-color: hsl(140 45% 48%);
+	color: var(--font-white-1);
+	font-weight: 600;
+}
+.frRoleShow { display: flex; flex-wrap: wrap; gap: 0.3em; padding-bottom: 0.6em; }
+.frRoleTag {
+	font-size: 80%;
+	color: var(--font-white-2);
+	background-color: var(--btn-bg-accent);
+	border: 1px solid var(--border-accent);
+	padding: 0.15em 0.55em;
+}
+
+.frFavRow, .frFavShow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35em; padding-bottom: 0.6em; }
+.frFavLab { font-size: 80%; color: var(--font-white-3); font-weight: 600; }
+.frFav {
+	font-size: 82%;
+	font-weight: 600;
+	color: var(--font-white-2);
+	border: 1px solid var(--border-accent);
+	padding: 0.15em 0.55em;
+	white-space: nowrap;
+}
+.frFavX { cursor: pointer; padding-left: 0.4em; opacity: 0.7; }
+.frFavX:hover { opacity: 1; }
+
+/* ---- published phrases / Leaders: one full-width row per phrase ----
+   (profilePhraseRowHtml, calc/profile-tab.js)
+
+   Deliberately not its own scroll box: the old .profileChipScroll fixed a
+   300px viewport with its own scrollbar inside a panel that already scrolls
+   with the page, which read as two nested scrollbars fighting each other.
+   This flows with the page instead - subtle row separators, no card border
+   around every phrase, no inner scrollbar to get confused with the outer
+   one. */
+.phraseList { border-top: 1px solid var(--border-dark-accent); }
+
+/* New (renderProfileNewBody) is the one exception: it is a live, ever-
+   growing firehose rather than a ranked top-N list, so its own scrollbar
+   with a sane cap keeps the Leaders panel itself a stable height instead of
+   growing without bound every time somebody publishes another phrase. A
+   shorter cap on narrow screens, not a fixed pixel height, so it never eats
+   more of a small viewport than the other Leaders tabs already do. */
+.phraseListScroll {
+	max-height: 520px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	-webkit-overflow-scrolling: touch;
+	padding-right: 0.2em;
+	scrollbar-width: thin;
+	scrollbar-color: var(--border-accent) transparent;
+}
+.phraseListScroll::-webkit-scrollbar { width: 8px; }
+.phraseListScroll::-webkit-scrollbar-track { background: transparent; }
+.phraseListScroll::-webkit-scrollbar-thumb { background-color: var(--border-accent); border-radius: 999px; }
+.phraseListScroll::-webkit-scrollbar-thumb:hover { background-color: var(--font-white-4); }
+@media (max-width: 620px) {
+	.phraseListScroll { max-height: 58vh; }
+}
+
+/* "little boxes for each phrase" - the look the contributor list
+   (profileRenderContributorList) had before reactions existed (.profileChip,
+   since retired) - a bordered card per phrase with a gap between, rather
+   than one flat divided row bleeding into the next. Opt-in via
+   .phraseListBoxed only, so Leaders' own New/Trending/Loved/Funny/CCRU tabs
+   keep the plain row style they already have. */
+.phraseListBoxed {
+	border-top: none;
+	display: flex;
+	flex-direction: column;
+	gap: 0.4em;
+}
+.phraseListBoxed .phraseRow {
+	border: 1px solid var(--border-dark-accent);
+	border-radius: 6px;
+	background: var(--btn-bg-accent);
+}
+.phraseListBoxed .phraseRow:hover { background: var(--btn-hover-accent); }
+.phraseListGroup {
+	padding: 0.5em 0.2em 0.3em 0.2em;
+	font-size: 78%;
+	font-weight: 700;
+	color: var(--font-white-3);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+.phraseRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1em;
+	padding: 0.6em 0.6em;
+	border-bottom: 1px solid var(--border-dark-accent);
+	cursor: pointer;
+}
+.phraseRow:hover { background: hsl(0 0% 100% / 0.03); }
+/* phrase, cypher/value and "by who" are three stacked lines of one column -
+   text-align is stated explicitly (not just relying on the default) so a
+   short phrase's line is anchored to the same left edge as the longer lines
+   under it rather than only equal by coincidence of the default. */
+.phraseRowMain { flex: 1 1 auto; min-width: 0; text-align: left; }
+.phraseRowTop { display: flex; align-items: baseline; gap: 0.4em; }
+.phraseRowRank { font-size: 76%; font-weight: 700; color: var(--font-white-3); flex: 0 0 auto; }
+/* the largest text in the row, per the redesign brief - a phrase is the
+   reason the row exists, everything else is context around it */
+.phraseRowText {
+	font-size: 112%;
+	font-weight: 600;
+	color: var(--font-white-1);
+	overflow-wrap: anywhere;
+}
+.phraseRowMeta {
+	font-size: 82%;
+	font-weight: 600;
+	color: var(--font-white-2);
+	padding-top: 0.1em;
+}
+.phraseRowVal { font-family: var(--font-family-mono), monospace; color: inherit; }
+.phraseRowSub { font-size: 76%; color: var(--font-white-3); padding-top: 0.15em; }
+.phraseRowReactions {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	gap: 0.3em;
+}
+@media (max-width: 620px) {
+	/* phrase info on top, reactions underneath, full width - never a tiny
+	   side column squeezing four reaction buttons into a sliver */
+	.phraseRow { flex-direction: column; align-items: stretch; gap: 0.5em; }
+	.phraseRowReactions { justify-content: flex-start; flex-wrap: wrap; }
+}
+
+/* the value or cypher a run of chips belongs to */
+.profileChipGroup {
+	flex: 1 0 100%;
+	font-size: 78%;
+	font-weight: 700;
+	color: var(--font-white-3);
+	letter-spacing: 0.04em;
+	padding: 0.6em 0 0.25em 0;
+	border-top: 1px solid var(--separator-accent2);
+	margin-top: 0.3em;
+}
+.profileChipGroup:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+
+/* ---- leaderboard podium ----
+   The top three get a metal. Kept to a left edge, a faint wash and a coloured
+   rank rather than a glow around the whole row: a leaderboard is a list you
+   scan, and three rows lit up like buttons would fight the names for
+   attention. */
+.profileRow.profileLbRow.frPodium1,
+.profileRow.profileLbRow.frPodium2,
+.profileRow.profileLbRow.frPodium3 { border-left-width: 3px; border-left-style: solid; }
+
+.profileLbRow.frPodium1 {
+	border-left-color: hsl(45 85% 55%);
+	background: linear-gradient(90deg, hsla(45 80% 50% / 0.16), transparent 45%);
+}
+.profileLbRow.frPodium2 {
+	border-left-color: hsl(210 12% 72%);
+	background: linear-gradient(90deg, hsla(210 10% 70% / 0.14), transparent 45%);
+}
+.profileLbRow.frPodium3 {
+	border-left-color: hsl(25 55% 50%);
+	background: linear-gradient(90deg, hsla(25 55% 45% / 0.14), transparent 45%);
+}
+.profileLbRow.frPodium1 .profileLbRank,
+.profileLbRow.frPodium2 .profileLbRank,
+.profileLbRow.frPodium3 .profileLbRank { font-size: 105%; }
+.profileLbRow.frPodium1 .profileRowPhrase { color: hsl(45 75% 78%); font-weight: 600; }
+.profileLbRow.frPodium2 .profileRowPhrase { color: hsl(210 15% 88%); font-weight: 600; }
+.profileLbRow.frPodium3 .profileRowPhrase { color: hsl(25 60% 74%); font-weight: 600; }
+
+/* ---- a conversation with something in it ----
+   Green means "something new happened", not the permanent colour of every
+   row - so a read thread and an unread one need to look almost like
+   different components, not shades of the same one. The row itself only
+   gets a quiet tint and a thin edge; the excitement lives in the preview
+   text and the dot below, which is where a glance actually lands. Stops the
+   moment the thread is opened, because at that point it is no longer news. */
+/* No zebra striping in the chat and notification lists.
+   .profileRow:nth-child(odd) paints every other row a neutral grey,
+   which is fine on the table-like lists it was written for (Leaders,
+   presets, saved CSVs) where rows have no read state. In here a
+   background IS the unread signal - and the grey stripe is heavier than
+   the unread tint below it, so a conversation you have already read
+   looked more unread than one you hadn't, purely by being in an odd
+   position. Background now means exactly one thing in these lists. */
+.profileRow.frRow:nth-child(odd) { background: none; }
+
+.profileRow.frRow.frThreadUnread {
+	background-color: hsla(140 55% 40% / 0.08);
+	border-left: 2px solid hsl(140 70% 50%);
+}
+
+/* The whole row is a button now, not just the name/preview slice of it - a
+   clear hand cursor, a small lift and a barely-there green wash on hover so
+   the card reads as pressable without turning into a rounded modern chip.
+   Border brightens rather than glows outright; the row already earns its
+   glow honestly when it is unread (below). */
+.profileRow.frRow.frRowClick {
+	cursor: pointer;
+	transition: transform 0.12s ease, background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+@media (hover: hover) {
+	.profileRow.frRow.frRowClick:hover {
+		background-color: hsla(0 0% 100% / 0.035);
+		border-color: hsl(140 35% 40%);
+		box-shadow: inset 0 0 0 1px hsla(140 70% 55% / 0.18), 0 0 8px hsla(140 60% 45% / 0.15);
+		transform: translateY(-1px);
+	}
+	.profileRow.frRow.frRowClick.frThreadUnread:hover {
+		border-color: hsl(140 55% 50%);
+		box-shadow: inset 0 0 0 1px hsla(140 80% 55% / 0.28), 0 0 10px hsla(140 70% 50% / 0.22);
+	}
+}
+@media (prefers-reduced-motion: reduce) { .profileRow.frRow.frRowClick { transition: none; } }
+@media (hover: none) { .profileRow.frRow.frRowClick:active { background-color: hsla(0 0% 100% / 0.05); } }
+
+/* the avatar corner, not the row - a dot reads as "unread" faster than a
+   tint alone, and survives even where the tint is easy to miss (a busy
+   background, a colour-blind read) */
+.frThreadWho { position: relative; }
+.frUnreadDot {
+	position: absolute;
+	top: -1px; right: -1px;
+	width: 9px; height: 9px;
+	border-radius: 50%;
+	background-color: hsl(140 85% 55%);
+	border: 1.5px solid var(--body-bg-accent);
+	box-shadow: 0 0 4px hsla(140 90% 60% / 0.7);
+}
+/* presence sits on the opposite corner from unread, so the two never
+   compete for the same pixel and stay readable together */
+.frPresenceDot {
+	position: absolute;
+	bottom: -1px; right: -1px;
+	width: 9px; height: 9px;
+	border-radius: 50%;
+	background-color: hsl(140 85% 55%);
+	border: 1.5px solid var(--body-bg-accent);
+	box-shadow: 0 0 4px hsla(140 90% 60% / 0.7);
+}
+
+/* name + timestamp share a line, timestamp pinned to the far side so it
+   reads as metadata rather than a second headline competing with the name */
+.frThreadTop { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5em; }
+.frThreadTime { font-size: 76%; color: var(--font-white-3); white-space: nowrap; flex: 0 0 auto; }
+
+/* the name: bold and white unread, ordinary once read - same idea as an
+   email client, and it works without colour at all */
+.frThreadNameUnread { color: var(--font-white-1); font-weight: 700; }
+
+/* a small, unmissable flag on the side that otherwise only ever holds the
+   hover-revealed archive/delete buttons - unread already reads from the tint,
+   the dot and the preview colour, but this is the one cue that survives even
+   a very quick glance down the list */
+.frNewBadge {
+	font-size: 68%;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	color: hsl(140 15% 8%);
+	background-color: hsl(140 85% 60%);
+	border-radius: 3px;
+	padding: 0.15em 0.4em;
+	box-shadow: 0 0 5px hsla(140 90% 55% / 0.5);
+}
+
+/* the message itself is where "new" actually reads - bigger, brighter, neon
+   green while unread; a plain grey preview like any other once it is not.
+   Two shadow layers rather than one: a tight bright core plus a wider soft
+   bloom around it, which is what actually reads as "glowing" rather than
+   just "outlined". font-size is restated in full (not "a bit more than
+   .frPreview") because same-specificity, later-wins means it replaces
+   .frPreview's own font-size on this element rather than compounding with
+   it - a relative bump here would have shrunk it back down instead. */
+.frPreviewUnread {
+	color: hsl(140 90% 68%);
+	font-weight: 700;
+	font-size: 125%;
+	text-shadow: 0 0 4px hsla(140 95% 70% / 0.8), 0 0 14px hsla(140 90% 55% / 0.55);
+}
+
+/* archive/delete: present but quiet until the row is worth looking at
+   closely - the message is what should dominate a row you are scanning, not
+   two action buttons sitting there unread or not. Always visible on touch,
+   which has no hover to reveal them with. */
+.frThreadBtn { opacity: 0; transition: opacity 0.15s ease; }
+.profileRow.frRow:hover .frThreadBtn,
+.profileRow.frRow:focus-within .frThreadBtn { opacity: 1; }
+@media (hover: none) { .frThreadBtn { opacity: 0.7; } }
+
+/* the Chats tab itself, while something in it is unread - a plain number
+   badge (like Friends/Requests get) reads as "waiting on you"; this is "new
+   message", which is a different feeling and gets the same green glow as the
+   thread row itself rather than the red badge treatment. */
+.intBtn3.frTab.frTabChatGlow {
+	border-color: hsl(140 80% 50%);
+	color: hsl(140 70% 75%);
+	animation: frChatTabGlow 1.8s ease-in-out infinite;
+}
+@keyframes frChatTabGlow {
+	0%, 100% { box-shadow: 0 0 3px 0 hsla(140 85% 55% / 0.3); }
+	50%      { box-shadow: 0 0 11px 1px hsla(140 90% 60% / 0.7); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.intBtn3.frTab.frTabChatGlow { animation: none; box-shadow: 0 0 6px 0 hsla(140 90% 55% / 0.5); }
+}
+
+.frThreadWho { flex: 0 0 auto; cursor: pointer; display: flex; align-items: center; }
+.frThreadName { cursor: pointer; }
+.frThreadName:hover { color: hsl(140 60% 66%); text-decoration: underline; }
+.frChatRules { padding-top: 0.5em; }
+.frChatRule {
+	font-size: 79%;
+	color: var(--font-white-3);
+	line-height: 1.45em;
+	padding: 0.12em 0;
+}
+
+.profileRules { padding-top: 0.6em; }
+.profileRule { font-size: 80%; color: var(--font-white-3); line-height: 1.45em; padding: 0.1em 0; }
+.profileRule b { color: var(--font-white-2); }
+
+/* ---- membership nav ----
+   The tabs run in three groups: what you work with, who you work with, and the
+   account. The separator is a gap, not a heading — an earlier version used
+   inline "WORKSPACE" / "COMMUNITY" / "ACCOUNT" labels, which sat at tab size
+   and looked clickable when they were not. Whitespace has neither problem. */
+.profileTab.profileTabRun { margin-left: 0.7em; }
+@media (max-width: 620px) {
+	.profileTab.profileTabRun { margin-left: 0.4em; }
+}
+
+
+/* ---- report dialog ---- */
+.frReportBack {
+	position: fixed; inset: 0; z-index: 400;
+	background: hsla(0 0% 0% / 0.55);
+}
+.frReportBox {
+	position: fixed; z-index: 401;
+	left: 50%; top: 50%; transform: translate(-50%, -50%);
+	width: min(23em, 92vw);
+	box-sizing: border-box;
+	background-color: var(--menu-bg-accent);
+	border: 1px solid var(--border-accent);
+	padding: 1em 1.1em 1.1em 1.1em;
+	max-height: 88vh; overflow-y: auto;
+}
+.frReportSel { width: 100%; max-width: 100%; }
+.frReportBtns { display: flex; gap: 0.4em; justify-content: flex-end; padding-top: 0.7em; }
+.profileMiniBtn.frThreadBtn { padding: 0.1em 0.45em; }
+
+/* ---- first-run onboarding ----
+   Sits over the welcome page rather than beside it: one question at a time,
+   and nothing else on screen competing for the answer. */
+.obBack {
+	position: fixed; inset: 0; z-index: 500;
+	background: hsla(0 0% 0% / 0.72);
+}
+.obBox {
+	position: fixed; z-index: 501;
+	left: 50%; top: 50%; transform: translate(-50%, -50%);
+	width: min(27em, 94vw);
+	max-height: 92vh;
+	box-sizing: border-box;
+	display: flex; flex-direction: column;
+	background-color: var(--menu-bg-accent);
+	border: 1px solid var(--border-accent);
+	padding: 1.2em 1.3em 1.1em 1.3em;
+}
+
+.obDots { display: flex; gap: 0.35em; justify-content: center; padding-bottom: 1.1em; flex: 0 0 auto; }
+.obDot {
+	width: 1.6em; height: 3px;
+	background-color: var(--separator-accent2);
+	transition: background-color 0.2s ease;
+}
+.obDotDone { background-color: hsl(140 45% 42%); }
+.obDotOn   { background-color: hsl(140 60% 60%); }
+@media (prefers-reduced-motion: reduce) { .obDot { transition: none; } }
+
+.obBody { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+
+.obIcon  { font-size: 210%; text-align: center; line-height: 1.1em; padding-bottom: 0.2em; }
+.obTitle {
+	font-size: 130%; font-weight: 600; text-align: center;
+	color: var(--font-white-1);
+	padding-bottom: 0.4em;
+}
+.obLead {
+	font-size: 88%; text-align: center; line-height: 1.5em;
+	color: var(--font-white-3);
+	padding-bottom: 1em;
+}
+.obNote {
+	font-size: 80%; text-align: center; line-height: 1.5em;
+	color: var(--font-white-4);
+	padding-top: 0.9em;
+}
+.obField { padding-bottom: 0.2em; }
+/* the username prompt shows over the calculator, where --font-white-4 is
+   too dark to read on this box (onboarding only ever showed on profile.html) */
+#usernameGate .authHint, #usernameGate .obNote { color: var(--font-white-3); }
+
+.obList { display: flex; flex-direction: column; gap: 0.7em; }
+.obPoint { display: flex; align-items: flex-start; gap: 0.6em; }
+.obPointIcon  { font-size: 125%; flex: 0 0 auto; line-height: 1.2em; }
+.obPointBody  { display: flex; flex-direction: column; min-width: 0; }
+.obPointTitle { font-size: 90%; font-weight: 600; color: var(--font-white-2); }
+.obPointBlurb { font-size: 80%; line-height: 1.45em; color: var(--font-white-3); }
+
+.obNav {
+	flex: 0 0 auto;
+	display: flex; gap: 0.4em; align-items: center;
+	padding-top: 1.1em;
+}
+.obNav .authBtn { margin: 0; flex: 0 0 auto; width: auto; padding-left: 1em; padding-right: 1em; }
+/* Skip sits between Back and Next, quiet but the same size to hit */
+.obBtnSkip { margin-left: auto !important; color: var(--font-white-4); }
+.obNav .authBtnPrimary { flex: 0 0 auto; }
+.obBtnWide { flex: 1 1 auto !important; width: 100% !important; }
+
+/* ---- guided member tour (calc/tour.js) ----
+   Distinct from first-run onboarding above - that is a self-contained
+   wizard collecting settings; this walks the real UI, spotlighting the
+   actual button or area rather than a copy of it. z-index sits above
+   everything else in the app, member panel included, since a tour step
+   often needs that panel open underneath it. */
+
+.tourOverlayBg {
+	position: fixed; inset: 0; z-index: 99990;
+	background: hsla(0 0% 0% / 0.72);
+}
+.tourWelcome {
+	position: fixed; z-index: 99991;
+	left: 50%; top: 50%; transform: translate(-50%, -50%);
+	width: min(24em, 92vw);
+	max-height: 88vh; overflow-y: auto;
+	box-sizing: border-box;
+	background-color: var(--menu-bg-accent);
+	border: 1px solid var(--border-accent);
+	padding: 1.3em 1.4em;
+	text-align: center;
+}
+.tourWelcomeTitle { font-size: 130%; font-weight: 700; color: var(--font-white-1); padding-bottom: 0.4em; }
+.tourWelcomeBody { color: var(--font-white-2); padding-bottom: 1.1em; line-height: 1.5em; }
+.tourWelcomeBtns { display: flex; gap: 0.5em; justify-content: center; }
+.tourWelcomeBtns .intBtn3 { width: auto; flex: 0 0 auto; padding: 0.5em 1.2em; }
+.tourBtnPrimary { background-color: var(--btn-active-accent); border-color: hsl(140 60% 50%); color: var(--font-white-1); }
+
+.tourPicker { text-align: left; }
+.tourPicker .tourWelcomeTitle, .tourPicker .tourWelcomeBody { text-align: center; }
+.tourSectionList { display: flex; flex-direction: column; gap: 0.5em; padding-bottom: 1.1em; }
+.tourSectionBtn {
+	display: flex; align-items: center; gap: 0.6em;
+	width: 100%; box-sizing: border-box;
+	padding: 0.6em 0.7em;
+	background: hsl(0 0% 100% / 0.04);
+	border: 1px solid var(--border-dark-accent);
+	color: var(--font-white-1);
+	cursor: pointer;
+	text-align: left;
+}
+.tourSectionBtn:hover { background: var(--btn-hover-accent); border-color: var(--font-white-3); }
+.tourSectionBtn.tourSectionDone { border-color: hsl(140 55% 45%); }
+.tourSectionIcon { font-size: 135%; flex: 0 0 auto; }
+.tourSectionBody { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.tourSectionLabel { font-weight: 600; }
+.tourSectionSteps { font-size: 76%; color: var(--font-white-3); }
+.tourSectionTick { color: hsl(140 70% 55%); font-weight: 700; flex: 0 0 auto; width: 1.2em; text-align: center; }
+
+/* the spotlight itself - a huge-spread box-shadow darkens everything
+   outside the target's own box, which reads as a hole cut in an overlay
+   without the clip-path math an actual hole would need, plus a neon green
+   ring so the target reads as "look here" even against a busy background */
+.tourSpotlight {
+	/* not !important, deliberately: an element that already sets its own
+	   position (like the absolutely-positioned #ctxExportMenu) needs to keep
+	   it - forcing relative on top of that turned its top/left, which are
+	   document-coordinate offsets under position:absolute, into an offset
+	   from its own in-flow position instead, throwing it off the bottom of
+	   the page. Plain static elements (most buttons/inputs, the common
+	   case) have nothing else setting position, so this still applies to
+	   them and still gives z-index a containing block to work in. */
+	position: relative;
+	z-index: 99993 !important;
+	box-shadow:
+		0 0 0 9999px hsla(0 0% 0% / 0.74),
+		0 0 0 3px hsl(140 90% 55%),
+		0 0 22px 3px hsla(140 90% 55% / 0.65) !important;
+	border-radius: 6px;
+}
+/* sits just under the spotlighted element, just over everything else -
+   catches clicks on the darkened background so the tour cannot be broken by
+   tapping something else mid-step, without blocking the target itself */
+.tourScrim { position: fixed; inset: 0; z-index: 99992; background: transparent; }
+
+.tourTooltip {
+	position: fixed; z-index: 99994;
+	width: min(20em, 88vw);
+	box-sizing: border-box;
+	background-color: var(--menu-bg-accent);
+	border: 1px solid hsl(140 60% 45%);
+	box-shadow: 0 0 18px hsla(140 80% 50% / 0.35);
+	padding: 0.9em 1em;
+}
+/* on a narrow screen the tooltip cannot chase a target that may be near
+   either edge - it becomes a fixed bottom sheet instead, same as the rest
+   of this site's mobile menus */
+.tourTooltipSheet {
+	position: fixed !important;
+	left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important;
+	width: 100% !important;
+	border-left: none; border-right: none; border-bottom: none;
+}
+.tourTooltipStep { font-size: 74%; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: hsl(140 70% 60%); padding-bottom: 0.3em; }
+.tourTooltipTitle { font-size: 112%; font-weight: 700; color: var(--font-white-1); padding-bottom: 0.35em; }
+.tourTooltipBody { font-size: 90%; line-height: 1.5em; color: var(--font-white-2); padding-bottom: 0.8em; }
+.tourTooltipBtns { display: flex; align-items: center; justify-content: space-between; gap: 0.4em; flex-wrap: wrap; }
+.tourTooltipLeft, .tourTooltipRight { display: flex; gap: 0.35em; }
+.tourTooltipRight .tourBtnPrimary { border-color: hsl(140 70% 55%); }
+
